@@ -1,12 +1,18 @@
+#!/usr/local/bin/python3
+
 import os
 import json
 import fpdf
 import spacy
 import xml.etree.ElementTree as ET
 import PyPDF2
+from transformers import GPT2LMHeadModel, GPT2Tokenizer
 
 nlp = spacy.load("en_core_web_sm")
 nlp.max_length = 9999999
+
+model = GPT2LMHeadModel.from_pretrained("gpt2")
+tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
 
 def read_facebook_data(file_path):
     with open(file_path, 'r', encoding='utf-8') as file:
@@ -44,7 +50,38 @@ def transform_messages(messages):
 
     return transformed_messages
 
-def compress_messages(messages):
+def compress_messages_gpt2(messages):
+    compressed_text = ''
+    current_chars = 0
+
+    for message in messages:
+        content = message['content']
+        content_with_space = content + ' '
+        prompt = f"Please summarize the following text:\n\n{content_with_space}\n"
+
+        input_ids = tokenizer.encode(prompt, return_tensors='pt')
+
+        with torch.no_grad():
+            output = model.generate(
+                input_ids,
+                max_length=100,
+                num_return_sequences=1,
+                no_repeat_ngram_size=2,
+                do_sample=True,
+                temperature=0.7,
+            )
+
+        summary = tokenizer.decode(output[0], skip_special_tokens=True).strip()
+
+        compressed_text += summary + ' '
+        current_chars += len(summary)
+
+        if current_chars >= 395000:
+            break
+
+    return compressed_text
+
+def compress_messages_nlp(messages):
     compressed_text = ''
     current_chars = 0
 
@@ -115,7 +152,7 @@ def main():
                 text = read_pdf_data(file_path)
                 messages.append({'sender_name': your_name, 'content': text})
 
-    compressed_text = compress_messages(messages)
+    compressed_text = compress_messages_gpt2(messages)
     write_messages_to_file(messages, output_json_file)
 
     max_chars = 3950000
