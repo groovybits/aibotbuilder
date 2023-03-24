@@ -145,7 +145,11 @@ def compress_messages_gpt(messages, model, tokenizer, max_chars, use_gpt3=False)
     summarize_func = summarize_message_gpt3 if use_gpt3 else summarize_message_gpt
 
     with ThreadPoolExecutor(max_workers=num_workers) as executor:
-        summaries = list(tqdm(executor.map(summarize_func, messages, model, tokenizer), total=len(messages), desc="Summarizing"))
+        if use_gpt3:
+            summaries = list(tqdm(executor.map(summarize_message_gpt3, messages), total=len(messages), desc="Summarizing"))
+        else:
+            summaries = list(tqdm(executor.map(lambda msg: summarize_message_gpt(msg, model, tokenizer), messages), total=len(messages), desc="Summarizing"))
+
 
     for summary in summaries:
         compressed_text += summary + ' '
