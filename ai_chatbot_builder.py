@@ -91,6 +91,7 @@ def summarize_message_gpt3(message):
         n=1,
         stop=None,
         temperature=0.7,
+        pad_token_id=tokenizer.eos_token_id,  # Add this line
     )
 
     summary = response.choices[0].text.strip()
