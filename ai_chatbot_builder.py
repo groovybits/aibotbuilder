@@ -270,7 +270,7 @@ def main():
 
     compressed_text = None
     if use_nlm:
-        compressed_text = compress_messages_nlm(messages)
+        compressed_text = compress_messages_nlp(messages)
     else:
         compressed_text = compress_messages_gpt(messages, model, tokenizer, max_chars, use_gpt3=args.use_gpt3)
     write_messages_to_file(messages, output_json_file)
