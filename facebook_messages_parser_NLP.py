@@ -73,9 +73,9 @@ def write_messages_to_pdf(text, output_file):
 
 def main():
     your_name = "John Doe"
-    output_json_file = "output.json"
-    output_text_file = "output.txt"
-    output_pdf_file = "output.pdf"
+    output_json_file = "%s_output.json" % your_name.replace(' ', '_')
+    output_text_file = "%s_output.txt" % your_name.replace(' ', '_')
+    output_pdf_file = "%s_output.pdf" % your_name.replace(' ', '_')
 
     messages = []
 
