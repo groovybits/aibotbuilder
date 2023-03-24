@@ -5,3 +5,4 @@ PyPDF2
 fpdf
 tqdm
 halo
+openapi

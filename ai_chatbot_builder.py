@@ -6,6 +6,7 @@ from contextlib import contextmanager
 import fpdf
 from halo import Halo
 import json
+import openai
 import os
 import PyPDF2
 import spacy
@@ -16,24 +17,7 @@ from tqdm import tqdm
 import xml.etree.ElementTree as ET
 
 
-# Create a parser
-parser = argparse.ArgumentParser(description='Script to process and summarize text messages.')
-
-# Add arguments
-parser.add_argument('--your_name', type=str, default="John Doe", help='Name in the Facebook profile and messages to use.')
-parser.add_argument('--max_chars', type=int, default=3950000, help='Chatbase.io allowance for input characters.')
-parser.add_argument('--use_nlm', action='store_true', help='Use NLM for summarization instead of GPT-2.')
-
-# Parse arguments
-args = parser.parse_args()
-
-# Use the parsed arguments
-your_name = args.your_name
-max_chars = args.max_chars
-use_nlm = args.use_nlm
-
 nlp = spacy.load("en_core_web_sm")
-nlp.max_length = 9999999
 
 @contextmanager
 def progress_spinner():
@@ -44,14 +28,15 @@ def progress_spinner():
     finally:
         spinner.stop()
 
-def load_model():
-    with progress_spinner() as spinner:
-        spinner.text = "Loading model..."
-        model = AutoModelForCausalLM.from_pretrained("gpt2")
-        tokenizer = AutoTokenizer.from_pretrained("gpt2")
-    return model, tokenizer
-
-model, tokenizer = load_model()
+def load_model(use_nlm, use_gpt3):
+    if use_nlm:
+        return None, None, "nlm"
+    elif use_gpt3:
+        return None, None, "gpt3"
+    else:
+        model = GPT2LMHeadModel.from_pretrained("gpt2")
+        tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+        return model, tokenizer, "gpt2"
 
 def read_facebook_data(file_path):
     with progress_spinner() as spinner:
@@ -95,7 +80,24 @@ def transform_messages(messages):
 
     return transformed_messages
 
-def summarize_message_gpt2(message):
+def summarize_message_gpt3(message):
+    content = message['content']
+    prompt = f"Please summarize the following text:\n\n{content}\n"
+
+    response = openai.Completion.create(
+        engine="text-davinci-002",
+        prompt=prompt,
+        max_tokens=60,
+        n=1,
+        stop=None,
+        temperature=0.7,
+    )
+
+    summary = response.choices[0].text.strip()
+    return summary
+
+
+def summarize_message_gpt(message, model, tokenizer):
     content = message['content']
 
     max_input_length = 1024 - tokenizer.num_special_tokens_to_add(pair=False) - 20  # Reserve some tokens for the prompt
@@ -133,16 +135,17 @@ def summarize_message_gpt2(message):
 
     return ' '.join(summaries)
 
-def compress_messages_gpt2(messages):
+def compress_messages_gpt(messages, model, tokenizer, max_chars, use_gpt3=False):
     compressed_text = ''
     current_chars = 0
 
     num_workers = os.cpu_count()
     print(f"Number of workers: {num_workers}")
 
+    summarize_func = summarize_message_gpt3 if use_gpt3 else summarize_message_gpt
+
     with ThreadPoolExecutor(max_workers=num_workers) as executor:
-        with progress_spinner() as spinner:
-            summaries = list(tqdm(executor.map(summarize_message_gpt2, messages), total=len(messages), desc="Summarizing", file=spinner._stream))
+        summaries = list(tqdm(executor.map(summarize_func, messages, model, tokenizer), total=len(messages), desc="Summarizing"))
 
     for summary in summaries:
         compressed_text += summary + ' '
@@ -198,11 +201,34 @@ def read_pdf_data(file_path):
     return text
 
 def main():
+    # Create a parser
+    parser = argparse.ArgumentParser(description='Script to process and summarize text messages.')
+
+    # Add arguments
+    parser.add_argument('--your_name', type=str, default="John Doe", help='Name in the Facebook profile and messages to use.')
+    parser.add_argument('--gpt_api_key', type=str, default="None", help='GPT OpenAI Key')
+    parser.add_argument('--max_chars', type=int, default=3950000, help='Chatbase.io allowance for input characters.')
+    parser.add_argument('--use_nlm', action='store_true', help='Use NLM for summarization instead of GPT-2.')
+    parser.add_argument('--use_gpt3', action='store_true', help='Use GPT-3 for summarization instead of GPT-2.')
+
+    # Parse arguments
+    args = parser.parse_args()
+
+    # Use the parsed arguments
+    your_name = args.your_name
+    max_chars = args.max_chars
+    use_nlm = args.use_nlm
+    use_gpt3 = args.use_gpt3
+    openai.api_key = args.gpt_api_key
+    nlp.max_length = 9999999
+
     output_json_file = "%s_output.json" % your_name.replace(' ', '_')
     output_text_file = "%s_output.txt" % your_name.replace(' ', '_')
     output_pdf_file = "%s_output.pdf" % your_name.replace(' ', '_')
 
     messages = []
+
+    model, tokenizer, model_type = load_model(args.use_nlm, args.use_gpt3)
 
     for root, _, files in os.walk('.'):
         for file in files:
@@ -227,7 +253,7 @@ def main():
     if use_nlm:
         compressed_text = compress_messages_nlm(messages)
     else:
-        compressed_text = compress_messages_gpt2(messages)
+        compressed_text = compress_messages_gpt(messages, model, tokenizer, max_chars, use_gpt3=args.use_gpt3)
     write_messages_to_file(messages, output_json_file)
 
     truncated_text = compressed_text[:max_chars]
