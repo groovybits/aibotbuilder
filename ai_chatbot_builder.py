@@ -17,9 +17,6 @@ from transformers import GPT2LMHeadModel, GPT2Tokenizer
 from tqdm import tqdm
 import xml.etree.ElementTree as ET
 
-
-nlp = spacy.load("en_core_web_sm")
-
 @contextmanager
 def progress_spinner():
     spinner = Halo(text='Summarizing...', spinner='dots')
@@ -170,7 +167,7 @@ def compress_messages_gpt(messages, model, tokenizer, max_chars, use_gpt3=False)
 
     return compressed_text
 
-def compress_messages_nlp(messages):
+def compress_messages_nlp(messages, nlp):
     compressed_text = ''
     current_chars = 0
 
@@ -233,7 +230,6 @@ def main():
     max_chars = args.max_chars
     use_gpt3 = args.use_gpt3
     use_gpt2 = args.use_gpt2
-    nlp.max_length = 9999999
 
     use_nlp = True
     if use_gpt3:
@@ -273,8 +269,10 @@ def main():
                 messages.append({'sender_name': your_name, 'content': text})
 
     compressed_text = None
-    if not use_gpt2 and not use_gpt3:
-        compressed_text = compress_messages_nlp(messages)
+    if use_nlp:
+        nlp = spacy.load("en_core_web_sm")
+        nlp.max_length = 9999999
+        compressed_text = compress_messages_nlp(messages, nlp)
     else:
         compressed_text = compress_messages_gpt(messages, model, tokenizer, max_chars, use_gpt3=args.use_gpt3)
     write_messages_to_file(messages, output_json_file)
