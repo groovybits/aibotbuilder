@@ -77,7 +77,7 @@ def compress_messages_gpt2(messages):
         compressed_text += summary + ' '
         current_chars += len(summary)
 
-        if current_chars >= 395000:
+        if current_chars >= 3950000:
             break
 
     return compressed_text
