@@ -4,3 +4,4 @@ spacy
 PyPDF2
 fpdf
 tqdm
+halo

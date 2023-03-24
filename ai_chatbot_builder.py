@@ -1,16 +1,20 @@
 #!/usr/local/bin/python3
 
 import argparse
-import os
-import json
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 import fpdf
-import torch
+from halo import Halo
+import json
+import os
+import PyPDF2
 import spacy
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import GPT2LMHeadModel, GPT2Tokenizer
 from tqdm import tqdm
 import xml.etree.ElementTree as ET
-import PyPDF2
-from transformers import GPT2LMHeadModel, GPT2Tokenizer
-from concurrent.futures import ThreadPoolExecutor
+
 
 # Create a parser
 parser = argparse.ArgumentParser(description='Script to process and summarize text messages.')
@@ -31,33 +35,54 @@ use_nlm = args.use_nlm
 nlp = spacy.load("en_core_web_sm")
 nlp.max_length = 9999999
 
-model = GPT2LMHeadModel.from_pretrained("gpt2")
-tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+@contextmanager
+def progress_spinner():
+    spinner = Halo(text='Summarizing...', spinner='dots')
+    spinner.start()
+    try:
+        yield spinner
+    finally:
+        spinner.stop()
+
+def load_model():
+    with progress_spinner() as spinner:
+        spinner.text = "Loading model..."
+        model = AutoModelForCausalLM.from_pretrained("gpt2")
+        tokenizer = AutoTokenizer.from_pretrained("gpt2")
+    return model, tokenizer
+
+model, tokenizer = load_model()
 
 def read_facebook_data(file_path):
-    with open(file_path, 'r', encoding='utf-8') as file:
-        data = json.load(file)
+    with progress_spinner() as spinner:
+        spinner.text = f"Reading Facebook data from {file_path}..."
+        with open(file_path, 'r', encoding='utf-8') as file:
+            data = json.load(file)
     return data
 
 def read_sms_data(file_path):
-    tree = ET.parse(file_path)
-    root = tree.getroot()
-    data = {'messages': []}
+    with progress_spinner() as spinner:
+        spinner.text = f"Reading SMS data from {file_path}..."
+        tree = ET.parse(file_path)
+        root = tree.getroot()
+        data = {'messages': []}
 
-    for sms in root.findall('sms'):
-        content = sms.get('body')
-        sender = sms.get('contact_name')
+        for sms in root.findall('sms'):
+            content = sms.get('body')
+            sender = sms.get('contact_name')
 
-        data['messages'].append({'sender_name': sender, 'content': content})
+            data['messages'].append({'sender_name': sender, 'content': content})
 
     return data
 
 def extract_messages(data, your_name):
-    extracted_messages = []
+    with progress_spinner() as spinner:
+        spinner.text = f"Extracting messages for {your_name}..."
+        extracted_messages = []
 
-    for message in data['messages']:
-        if message['sender_name'] == your_name:
-            extracted_messages.append(message)
+        for message in data['messages']:
+            if message['sender_name'] == your_name:
+                extracted_messages.append(message)
 
     return extracted_messages
 
@@ -116,7 +141,8 @@ def compress_messages_gpt2(messages):
     print(f"Number of workers: {num_workers}")
 
     with ThreadPoolExecutor(max_workers=num_workers) as executor:
-        summaries = list(tqdm(executor.map(summarize_message_gpt2, messages), total=len(messages), desc="Summarizing"))
+        with progress_spinner() as spinner:
+            summaries = list(tqdm(executor.map(summarize_message_gpt2, messages), total=len(messages), desc="Summarizing", file=spinner._stream))
 
     for summary in summaries:
         compressed_text += summary + ' '
