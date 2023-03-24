@@ -6,6 +6,7 @@ import json
 import fpdf
 import torch
 import spacy
+from tqdm import tqdm
 import xml.etree.ElementTree as ET
 import PyPDF2
 from transformers import GPT2LMHeadModel, GPT2Tokenizer
@@ -111,8 +112,11 @@ def compress_messages_gpt2(messages):
     compressed_text = ''
     current_chars = 0
 
-    with ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
-        summaries = list(executor.map(summarize_message_gpt2, messages))
+    num_workers = os.cpu_count()
+    print(f"Number of workers: {num_workers}")
+
+    with ThreadPoolExecutor(max_workers=num_workers) as executor:
+        summaries = list(tqdm(executor.map(summarize_message_gpt2, messages), total=len(messages), desc="Summarizing"))
 
     for summary in summaries:
         compressed_text += summary + ' '
@@ -122,7 +126,6 @@ def compress_messages_gpt2(messages):
             break
 
     return compressed_text
-
 
 def compress_messages_nlp(messages):
     compressed_text = ''

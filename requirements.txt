@@ -3,3 +3,4 @@ transformers
 spacy
 PyPDF2
 fpdf
+tqdm
