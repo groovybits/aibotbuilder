@@ -17,6 +17,7 @@ import json
 import openai
 import os
 import PyPDF2
+import re
 import spacy
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -181,7 +182,7 @@ def compress_message_nlp(message, nlp):
     compressed_text = ''.join(sent.text for sent in doc.sents)
     return compressed_text
 
-def compress_messages_nlp_parallel(messages, nlp, num_threads=os.cpu_count()):
+def compress_messages_nlp(messages, nlp, num_threads=os.cpu_count()):
     with concurrent.futures.ThreadPoolExecutor(max_workers=num_threads) as executor:
         compressed_texts = list(executor.map(lambda msg: compress_message_nlp(msg, nlp), messages))
     return ''.join(compressed_texts)
@@ -213,12 +214,48 @@ def read_pdf_data(file_path):
 
     return text
 
+def get_message_sets(your_names):
+    message_sets = []
+
+    for your_name in your_names:
+        your_name = your_name.strip()
+        message_sets.append(collect_messages(your_name))
+
+    return message_sets
+
+def collect_messages(your_name):
+    messages_set = []
+
+    for root, _, files in os.walk('.'):
+        for file in files:
+            if file.startswith('message_') and file.endswith('.json'):
+                file_path = os.path.join(root, file)
+                with open(file_path, 'r', encoding='utf-8') as json_file:
+                    data = json.load(json_file)
+
+                    for message in data['messages']:
+                        if 'content' in message and message['sender_name'] == your_name:
+                            text = message['content']
+                            messages_set.append({'sender_name': your_name, 'content': text})
+            elif file.endswith('.xml'):
+                file_path = os.path.join(root, file)
+                data = read_sms_data(file_path)
+                extracted_messages = extract_messages(data, your_name)
+                transformed_messages = transform_messages(extracted_messages)
+                messages_set.extend(transformed_messages)
+            elif file.endswith('.pdf') and root.startswith('./books'):
+                file_path = os.path.join(root, file)
+                text = read_pdf_data(file_path)
+                messages_set.append({'sender_name': your_name, 'content': text})
+
+    return messages_set
+
 def main():
     # Create a parser
     parser = argparse.ArgumentParser(description='Script to process and summarize text messages.')
 
     # Add arguments
-    parser.add_argument('--your_name', type=str, default="John Doe", help='Name in the Facebook profile and messages to use.')
+    parser.add_argument('--your_names', type=str, default="John Doe", help='Comma-separated names in the Facebook profile and messages to use.')
     parser.add_argument('--gpt_api_key', type=str, default="None", help='GPT OpenAI Key')
     parser.add_argument('--max_chars', type=int, default=3950000, help='Chatbase.io allowance for input characters.')
     parser.add_argument('--use_gpt2', action='store_true', help='Use GPT-2 for summarization, the default is NLP (fast).')
@@ -228,7 +265,7 @@ def main():
     args = parser.parse_args()
 
     # Use the parsed arguments
-    your_name = args.your_name
+    your_names = args.your_names.split(',')
     max_chars = args.max_chars
     use_gpt3 = args.use_gpt3
     use_gpt2 = args.use_gpt2
@@ -243,52 +280,33 @@ def main():
     elif use_gpt2:
         use_nlp = False
 
-    output_json_file = "%s_output.json" % your_name.replace(' ', '_')
-    output_text_file = "%s_output.txt" % your_name.replace(' ', '_')
-    output_pdf_file = "%s_output.pdf" % your_name.replace(' ', '_')
+    message_sets = get_message_sets(your_names)
 
-    messages = []
+    for your_name, message_set in zip(your_names, message_sets):
+        output_json_file = f"{your_name.strip().replace(' ', '_')}_output.json"
+        output_text_file = f"{your_name.strip().replace(' ', '_')}_output.txt"
+        output_pdf_file = f"{your_name.strip().replace(' ', '_')}_output.pdf"
 
-    model, tokenizer, model_type = load_model(use_nlp, args.use_gpt3)
+        model, tokenizer, model_type = load_model(use_nlp, args.use_gpt3)
 
-    for root, _, files in os.walk('.'):
-        for file in files:
-            if file.startswith('message_') and file.endswith('.json'):
-                file_path = os.path.join(root, file)
-                data = read_facebook_data(file_path)
-                extracted_messages = extract_messages(data, your_name)
-                transformed_messages = transform_messages(extracted_messages)
-                messages.extend(transformed_messages)
-            elif file.endswith('.xml'):
-                file_path = os.path.join(root, file)
-                data = read_sms_data(file_path)
-                extracted_messages = extract_messages(data, your_name)
-                transformed_messages = transform_messages(extracted_messages)
-                messages.extend(transformed_messages)
-            elif file.endswith('.pdf') and root.startswith('./books'):
-                file_path = os.path.join(root, file)
-                text = read_pdf_data(file_path)
-                messages.append({'sender_name': your_name, 'content': text})
+        if use_nlp:
+            nlp = spacy.load("en_core_web_sm")
+            nlp.max_length = 9999999
+            compressed_text = compress_messages_nlp(message_set, nlp)
+        else:
+            compressed_text = compress_messages_gpt(message_set, model, tokenizer, max_chars, use_gpt3=args.use_gpt3)
 
-    compressed_text = None
-    if use_nlp:
-        nlp = spacy.load("en_core_web_sm")
-        nlp.max_length = 9999999
-        compressed_text = compress_messages_nlp_parallel(messages, nlp)
-    else:
-        compressed_text = compress_messages_gpt(messages, model, tokenizer, max_chars, use_gpt3=args.use_gpt3)
-    write_messages_to_file(messages, output_json_file)
+        write_messages_to_file(message_set, output_json_file)
 
-    truncated_text = compressed_text[:max_chars]
+        truncated_text = compressed_text[:max_chars]
 
-    # Remove non-Latin-1 characters
-    latin1_text = remove_non_latin1_characters(truncated_text)
+        # Remove non-Latin-1 characters
+        latin1_text = remove_non_latin1_characters(truncated_text)
 
-    with open(output_text_file, 'w', encoding='latin-1') as file:
-        file.write(latin1_text)
+        with open(output_text_file, 'w', encoding='latin-1') as file:
+            file.write(latin1_text)
 
-    write_messages_to_pdf(latin1_text, output_pdf_file)
-
+        write_messages_to_pdf(latin1_text, output_pdf_file)
 
 if __name__ == '__main__':
     main()
