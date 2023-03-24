@@ -3,8 +3,10 @@ import json
 import fpdf
 import spacy
 import xml.etree.ElementTree as ET
+import PyPDF2
 
 nlp = spacy.load("en_core_web_sm")
+nlp.max_length = 9999999
 
 def read_facebook_data(file_path):
     with open(file_path, 'r', encoding='utf-8') as file:
@@ -71,8 +73,23 @@ def write_messages_to_pdf(text, output_file):
     pdf.multi_cell(0, 10, text)
     pdf.output(output_file)
 
+def remove_non_latin1_characters(text):
+    return text.encode('latin-1', errors='ignore').decode('latin-1')
+
+def read_pdf_data(file_path):
+    with open(file_path, 'rb') as file:
+        pdf_reader = PyPDF2.PdfReader(file)
+        num_pages = len(pdf_reader.pages)
+
+        text = ''
+        for page_num in range(num_pages):
+            page = pdf_reader.pages[page_num]
+            text += page.extract_text()
+
+    return text
+
 def main():
-    your_name = "John Doe"
+    your_name = "TibetanBuddhistKanjur"
     output_json_file = "%s_output.json" % your_name.replace(' ', '_')
     output_text_file = "%s_output.txt" % your_name.replace(' ', '_')
     output_pdf_file = "%s_output.pdf" % your_name.replace(' ', '_')
@@ -93,6 +110,10 @@ def main():
                 extracted_messages = extract_messages(data, your_name)
                 transformed_messages = transform_messages(extracted_messages)
                 messages.extend(transformed_messages)
+            elif file.endswith('.pdf') and root.startswith('./books'):
+                file_path = os.path.join(root, file)
+                text = read_pdf_data(file_path)
+                messages.append({'sender_name': your_name, 'content': text})
 
     compressed_text = compress_messages(messages)
     write_messages_to_file(messages, output_json_file)
@@ -100,10 +121,13 @@ def main():
     max_chars = 3950000
     truncated_text = compressed_text[:max_chars]
 
-    with open(output_text_file, 'w', encoding='utf-8') as file:
-        file.write(truncated_text)
+    # Remove non-Latin-1 characters
+    latin1_text = remove_non_latin1_characters(truncated_text)
 
-    write_messages_to_pdf(truncated_text, output_pdf_file)
+    with open(output_text_file, 'w', encoding='latin-1') as file:
+        file.write(latin1_text)
+
+    write_messages_to_pdf(latin1_text, output_pdf_file)
 
 
 if __name__ == '__main__':
