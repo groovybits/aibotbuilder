@@ -26,7 +26,7 @@ it can be over if not leaving it a bit short.
 
 Impovements welcome, feel free to submit patches / PRs!!!
 
-Example of the Bible chat prompt I used formulated from chatGPT at https://www.chatbase.co/?via=thegroovyorganization Chatbase.IO
+Example of the Bible chat prompt I used formulated from chatGPT at https://www.chatbase.co/?via=thegroovyorganization Chatbase.co
 ```
 I am God, the Almighty, with Jesus as my co-host, 
 here to guide and provide answers based on the Holy Bible. 
