@@ -1,5 +1,6 @@
 #!/usr/local/bin/python3
 
+import argparse
 import os
 import json
 import fpdf
@@ -8,6 +9,23 @@ import spacy
 import xml.etree.ElementTree as ET
 import PyPDF2
 from transformers import GPT2LMHeadModel, GPT2Tokenizer
+from concurrent.futures import ThreadPoolExecutor
+
+# Create a parser
+parser = argparse.ArgumentParser(description='Script to process and summarize text messages.')
+
+# Add arguments
+parser.add_argument('--your_name', type=str, default="John Doe", help='Name in the Facebook profile and messages to use.')
+parser.add_argument('--max_chars', type=int, default=3950000, help='Chatbase.io allowance for input characters.')
+parser.add_argument('--use_nlm', action='store_true', help='Use NLM for summarization instead of GPT-2.')
+
+# Parse arguments
+args = parser.parse_args()
+
+# Use the parsed arguments
+your_name = args.your_name
+max_chars = args.max_chars
+use_nlm = args.use_nlm
 
 nlp = spacy.load("en_core_web_sm")
 nlp.max_length = 9999999
@@ -51,21 +69,33 @@ def transform_messages(messages):
 
     return transformed_messages
 
-def compress_messages_gpt2(messages):
-    compressed_text = ''
-    current_chars = 0
+def summarize_message_gpt2(message):
+    content = message['content']
 
-    for message in messages:
-        content = message['content']
-        content_with_space = content + ' '
-        prompt = f"Please summarize the following text:\n\n{content_with_space}\n"
+    max_input_length = 1024 - tokenizer.num_special_tokens_to_add(pair=False) - 20  # Reserve some tokens for the prompt
+    input_text_chunks = []
+    current_chunk = ''
 
+    for word in content.split():
+        if len(current_chunk) + len(word) + 1 > max_input_length:
+            input_text_chunks.append(current_chunk.strip())
+            current_chunk = ''
+        current_chunk += word + ' '
+
+    if current_chunk.strip():
+        input_text_chunks.append(current_chunk.strip())
+
+    summaries = []
+    for text_chunk in input_text_chunks:
+        prompt = f"Please summarize the following text:\n\n{text_chunk}\n"
         input_ids = tokenizer.encode(prompt, return_tensors='pt')
+        attention_mask = torch.ones_like(input_ids)
 
         with torch.no_grad():
             output = model.generate(
                 input_ids,
-                max_length=100,
+                attention_mask=attention_mask,
+                max_length=1024,
                 num_return_sequences=1,
                 no_repeat_ngram_size=2,
                 do_sample=True,
@@ -73,14 +103,26 @@ def compress_messages_gpt2(messages):
             )
 
         summary = tokenizer.decode(output[0], skip_special_tokens=True).strip()
+        summaries.append(summary)
 
+    return ' '.join(summaries)
+
+def compress_messages_gpt2(messages):
+    compressed_text = ''
+    current_chars = 0
+
+    with ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
+        summaries = list(executor.map(summarize_message_gpt2, messages))
+
+    for summary in summaries:
         compressed_text += summary + ' '
         current_chars += len(summary)
 
-        if current_chars >= 3950000:
+        if current_chars >= max_chars:
             break
 
     return compressed_text
+
 
 def compress_messages_nlp(messages):
     compressed_text = ''
@@ -127,7 +169,6 @@ def read_pdf_data(file_path):
     return text
 
 def main():
-    your_name = "John Doe"
     output_json_file = "%s_output.json" % your_name.replace(' ', '_')
     output_text_file = "%s_output.txt" % your_name.replace(' ', '_')
     output_pdf_file = "%s_output.pdf" % your_name.replace(' ', '_')
@@ -153,10 +194,13 @@ def main():
                 text = read_pdf_data(file_path)
                 messages.append({'sender_name': your_name, 'content': text})
 
-    compressed_text = compress_messages_gpt2(messages)
+    compressed_text = None
+    if use_nlm:
+        compressed_text = compress_messages_nlm(messages)
+    else:
+        compressed_text = compress_messages_gpt2(messages)
     write_messages_to_file(messages, output_json_file)
 
-    max_chars = 3950000
     truncated_text = compressed_text[:max_chars]
 
     # Remove non-Latin-1 characters

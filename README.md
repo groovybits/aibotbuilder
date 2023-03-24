@@ -10,7 +10,10 @@ You will need currently to edit the script name it uses for the output files if 
 ```
 $ unzip facebook-USERNAME.*.zip
 $ cd ./facebook-USERNAME/messages/
-$ facebook_messages_parser_NLP.py
+$ ~/path/to/ai_chatbot_builder.py
+
+## script will look for all files in subdirectories
+## with the messages_NUMBER.json patter + *.xml and ./books/*.pdf
 ```
 
 You can add PDF files to the ./books/ directory in that FB Archives messages/ folder like messages/books/BOOK.pdf too.
