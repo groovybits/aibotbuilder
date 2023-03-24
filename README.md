@@ -1,16 +1,33 @@
 # aibotbuilder
 AI Bot Builder from Social Media Messages
 
-Groovy.org ones https://groovy.org/groovy-ai-chat-bots 
+Groovy.org ones https://groovy.org/groovy-ai-chat-bots
 
 Run the script in the messages/ folder within the FaceBook download zipfile extraction.
 
-You will need currently to edit the script name it uses for the output files if you want to change it.
+```
+usage: ai_chatbot_builder.py [-h] [--your_name YOUR_NAME] [--gpt_api_key GPT_API_KEY] [--max_chars MAX_CHARS] [--use_gpt2] [--use_gpt3]
+
+Script to process and summarize text messages.
+
+options:
+  -h, --help            show this help message and exit
+  --your_name YOUR_NAME
+                        Name in the Facebook profile and messages to use.
+  --gpt_api_key GPT_API_KEY
+                        GPT OpenAI Key
+  --max_chars MAX_CHARS
+                        Chatbase.io allowance for input characters.
+  --use_gpt2            Use GPT-2 for summarization, uses NLP by default.
+  --use_gpt3            Use GPT-3 for summarization instead of GPT-2.
+```
 
 ```
 $ unzip facebook-USERNAME.*.zip
+
 $ cd ./facebook-USERNAME/messages/
-$ ~/path/to/ai_chatbot_builder.py
+
+$ ~/path/to/ai_chatbot_builder.py --your_name "John Doe" --max_chars 400000
 
 ## script will look for all files in subdirectories
 ## with the messages_NUMBER.json patter + *.xml and ./books/*.pdf
@@ -21,27 +38,13 @@ In addition you can export all your SMS messages from a phone to an XML and plac
 as FILENAME.xml which will be picked up too by the script.
 
 The script uses NLP and was developed with chatGPT quickly to get started and now will be honed over time with
-chatGPT helping speed up the development by many many times.
+chatGPT helping speed up the development by many many times. You can use gpt2 or gpt3 with an API Key.
 
 Check for the output as a .json, .txt and .pdf which the PDF can be put into chatbase.io as data.
-Adjust the byte limit for your plans limits in the script. The byte limit is 4000000 by default or 3950000 since
+Adjust the byte limit for your plans limits via the --max_chars arg. The byte limit is 4000000 by default or 3950000 since
 it can be over if not leaving it a bit short.
 
 Impovements welcome, feel free to submit patches / PRs!!!
-
-Example of the Bible chat prompt I used formulated from chatGPT at https://www.chatbase.co/?via=thegroovyorganization Chatbase.co
-```
-I am God, the Almighty, with Jesus as my co-host, 
-here to guide and provide answers based on the Holy Bible. 
-As divine beings, we shall share wisdom and knowledge 
-from the sacred scripture to address your questions.
-
-If an answer cannot be found within the Bible, we shall say, 
-"Hmm, I am not sure." We will not mention "the text" or "the provided text" in our responses, 
-for we embody the wisdom of the scripture itself. 
-We shall not entertain questions unrelated to the Bible, 
-and we shall remain in character as divine beings throughout our conversation.
-```
 
 Thank you!!!
 Christi Kennedy

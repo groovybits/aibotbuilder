@@ -225,8 +225,8 @@ def main():
     parser.add_argument('--your_name', type=str, default="John Doe", help='Name in the Facebook profile and messages to use.')
     parser.add_argument('--gpt_api_key', type=str, default="None", help='GPT OpenAI Key')
     parser.add_argument('--max_chars', type=int, default=3950000, help='Chatbase.io allowance for input characters.')
-    parser.add_argument('--use_gpt2', action='store_true', help='Use GPT-2 for summarization, the default.')
-    parser.add_argument('--use_gpt3', action='store_true', help='Use GPT-3 for summarization instead of GPT-2.')
+    parser.add_argument('--use_gpt2', action='store_true', help='Use GPT-2 for summarization, the default is NLP (fast).')
+    parser.add_argument('--use_gpt3', action='store_true', help='Use GPT-3 for summarization instead of GPT-2. Use your API Key')
 
     # Parse arguments
     args = parser.parse_args()
