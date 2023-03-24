@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 import fpdf
 from halo import Halo
+import itertools
 import json
 import openai
 import os
@@ -80,6 +81,15 @@ def transform_messages(messages):
 
     return transformed_messages
 
+def check_gpt3_api_key(api_key):
+    try:
+        openai.api_key = api_key
+        openai.Engine.list()
+        return True
+    except openai.OpenAIError as e:
+        print(f"GPT-3 API key error: {e}")
+        return False
+
 def summarize_message_gpt3(message):
     content = message['content']
     prompt = f"Please summarize the following text:\n\n{content}\n"
@@ -90,8 +100,7 @@ def summarize_message_gpt3(message):
         max_tokens=60,
         n=1,
         stop=None,
-        temperature=0.7,
-        pad_token_id=tokenizer.eos_token_id,  # Add this line
+        temperature=0.7
     )
 
     summary = response.choices[0].text.strip()
@@ -224,8 +233,13 @@ def main():
     max_chars = args.max_chars
     use_nlm = args.use_nlm
     use_gpt3 = args.use_gpt3
-    openai.api_key = args.gpt_api_key
     nlp.max_length = 9999999
+
+    if use_gpt3:
+        if not check_gpt3_api_key(args.gpt_api_key):
+            print("Invalid GPT-3 API key. Exiting.")
+            return
+        openai.api_key = args.gpt_api_key
 
     output_json_file = "%s_output.json" % your_name.replace(' ', '_')
     output_text_file = "%s_output.txt" % your_name.replace(' ', '_')
