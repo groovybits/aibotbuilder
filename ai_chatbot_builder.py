@@ -1,5 +1,11 @@
 #!/usr/local/bin/python3
 
+## Christi Kennedy (C) March 2023
+### GPL based license
+###
+### Chat Bot Builder - uses FB messages, SMS, PDFs
+###  feed output PDFs into chatbase.co or another AI Bot
+
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
