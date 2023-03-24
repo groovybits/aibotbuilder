@@ -89,7 +89,7 @@ def read_pdf_data(file_path):
     return text
 
 def main():
-    your_name = "TibetanBuddhistKanjur"
+    your_name = "John Doe"
     output_json_file = "%s_output.json" % your_name.replace(' ', '_')
     output_text_file = "%s_output.txt" % your_name.replace(' ', '_')
     output_pdf_file = "%s_output.pdf" % your_name.replace(' ', '_')
