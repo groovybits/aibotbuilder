@@ -29,8 +29,8 @@ def progress_spinner():
     finally:
         spinner.stop()
 
-def load_model(use_nlm, use_gpt3):
-    if use_nlm:
+def load_model(use_nlp, use_gpt3):
+    if use_nlp:
         return None, None, "nlm"
     elif use_gpt3:
         return None, None, "gpt3"
@@ -222,7 +222,7 @@ def main():
     parser.add_argument('--your_name', type=str, default="John Doe", help='Name in the Facebook profile and messages to use.')
     parser.add_argument('--gpt_api_key', type=str, default="None", help='GPT OpenAI Key')
     parser.add_argument('--max_chars', type=int, default=3950000, help='Chatbase.io allowance for input characters.')
-    parser.add_argument('--use_nlm', action='store_true', help='Use NLM for summarization instead of GPT-2.')
+    parser.add_argument('--use_gpt2', action='store_true', help='Use GPT-2 for summarization, the default.')
     parser.add_argument('--use_gpt3', action='store_true', help='Use GPT-3 for summarization instead of GPT-2.')
 
     # Parse arguments
@@ -231,15 +231,19 @@ def main():
     # Use the parsed arguments
     your_name = args.your_name
     max_chars = args.max_chars
-    use_nlm = args.use_nlm
     use_gpt3 = args.use_gpt3
+    use_gpt2 = args.use_gpt2
     nlp.max_length = 9999999
 
+    use_nlp = True
     if use_gpt3:
         if not check_gpt3_api_key(args.gpt_api_key):
             print("Invalid GPT-3 API key. Exiting.")
             return
         openai.api_key = args.gpt_api_key
+        use_nlp = False
+    elif use_gpt2:
+        use_nlp = False
 
     output_json_file = "%s_output.json" % your_name.replace(' ', '_')
     output_text_file = "%s_output.txt" % your_name.replace(' ', '_')
@@ -247,7 +251,7 @@ def main():
 
     messages = []
 
-    model, tokenizer, model_type = load_model(args.use_nlm, args.use_gpt3)
+    model, tokenizer, model_type = load_model(use_nlp, args.use_gpt3)
 
     for root, _, files in os.walk('.'):
         for file in files:
@@ -269,7 +273,7 @@ def main():
                 messages.append({'sender_name': your_name, 'content': text})
 
     compressed_text = None
-    if use_nlm:
+    if not use_gpt2 and not use_gpt3:
         compressed_text = compress_messages_nlp(messages)
     else:
         compressed_text = compress_messages_gpt(messages, model, tokenizer, max_chars, use_gpt3=args.use_gpt3)
