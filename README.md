@@ -6,20 +6,20 @@ Groovy.org example bots: https://groovy.org/groovy-ai-chat-bots
 
 ## How to use:
 ```
-usage: ai_chatbot_builder.py [-h] [--your_name YOUR_NAME] [--gpt_api_key GPT_API_KEY] [--max_chars MAX_CHARS] [--use_gpt2] [--use_gpt3]
+usage: ai_chatbot_builder.py [-h] [--your_names YOUR_NAMES] [--gpt_api_key GPT_API_KEY] [--max_chars MAX_CHARS] [--use_gpt2] [--use_gpt3]
 
 Script to process and summarize text messages.
 
 options:
   -h, --help            show this help message and exit
-  --your_name YOUR_NAME
-                        Name in the Facebook profile and messages to use.
+  --your_names YOUR_NAMES
+                        Comma-separated names in the Facebook profile and messages to use.
   --gpt_api_key GPT_API_KEY
                         GPT OpenAI Key
   --max_chars MAX_CHARS
                         Chatbase.io allowance for input characters.
-  --use_gpt2            Use GPT-2 for summarization, uses NLP by default.
-  --use_gpt3            Use GPT-3 for summarization instead of GPT-2.
+  --use_gpt2            Use GPT-2 for summarization, the default is NLP (fast).
+  --use_gpt3            Use GPT-3 for summarization instead of GPT-2. Use your API Key
 ```
 
 ## Run the script in the messages/ folder within the FaceBook download zipfile extraction.
@@ -28,7 +28,7 @@ $ unzip facebook-USERNAME.*.zip
 
 $ cd ./facebook-USERNAME/messages/
 
-$ ~/path/to/ai_chatbot_builder.py --your_name "John Doe" --max_chars 400000
+$ ~/path/to/ai_chatbot_builder.py --your_names "John Doe","Jane Doe" --max_chars 400000
 
 ## script will look for all files in subdirectories
 ## with the messages_NUMBER.json patter + *.xml and ./books/*.pdf
