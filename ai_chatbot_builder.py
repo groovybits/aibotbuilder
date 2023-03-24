@@ -285,6 +285,7 @@ def main():
     for your_name, message_set in zip(your_names, message_sets):
         output_json_file = f"{your_name.strip().replace(' ', '_')}_output.json"
         output_text_file = f"{your_name.strip().replace(' ', '_')}_output.txt"
+        output_full_text_file = f"{your_name.strip().replace(' ', '_')}_full_output.txt"
         output_pdf_file = f"{your_name.strip().replace(' ', '_')}_output.pdf"
 
         model, tokenizer, model_type = load_model(use_nlp, args.use_gpt3)
@@ -298,13 +299,17 @@ def main():
 
         write_messages_to_file(message_set, output_json_file)
 
-        truncated_text = compressed_text[:max_chars]
-
         # Remove non-Latin-1 characters
-        latin1_text = remove_non_latin1_characters(truncated_text)
+        latin1_text = remove_non_latin1_characters(compressed_text)
+
+        # Truncate output to our limitations of the chatbot input
+        truncated_text = latin1_text[:max_chars]
+
+        with open(output_full_text_file, 'w', encoding='latin-1') as file:
+            file.write(latin1_text)
 
         with open(output_text_file, 'w', encoding='latin-1') as file:
-            file.write(latin1_text)
+            file.write(truncated_text)
 
         write_messages_to_pdf(latin1_text, output_pdf_file)
 
