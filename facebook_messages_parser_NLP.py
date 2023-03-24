@@ -3,6 +3,7 @@
 import os
 import json
 import fpdf
+import torch
 import spacy
 import xml.etree.ElementTree as ET
 import PyPDF2
