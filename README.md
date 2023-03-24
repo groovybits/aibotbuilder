@@ -1,10 +1,10 @@
 # aibotbuilder
-AI Bot Builder from Social Media Messages
+AI Bot Builder from FB Messages, SMS, PDF Files/Books
 
-Groovy.org ones https://groovy.org/groovy-ai-chat-bots
+Groovy.org example bots: https://groovy.org/groovy-ai-chat-bots
 
-Run the script in the messages/ folder within the FaceBook download zipfile extraction.
 
+*How to use:
 ```
 usage: ai_chatbot_builder.py [-h] [--your_name YOUR_NAME] [--gpt_api_key GPT_API_KEY] [--max_chars MAX_CHARS] [--use_gpt2] [--use_gpt3]
 
@@ -22,6 +22,7 @@ options:
   --use_gpt3            Use GPT-3 for summarization instead of GPT-2.
 ```
 
+*Run the script in the messages/ folder within the FaceBook download zipfile extraction.
 ```
 $ unzip facebook-USERNAME.*.zip
 
@@ -46,6 +47,7 @@ it can be over if not leaving it a bit short.
 
 Impovements welcome, feel free to submit patches / PRs!!!
 
+---
 Thank you!!!
 Christi Kennedy
 
