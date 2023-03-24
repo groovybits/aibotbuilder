@@ -5,9 +5,11 @@ Run the script in the messages/ folder within the FaceBook download zipfile extr
 
 You will need currently to edit the script name it uses for the output files if you want to change it.
 
+```
 $ unzip facebook-USERNAME.*.zip
 $ cd ./facebook-USERNAME/messages/
 $ facebook_messages_parser_NLP.py
+```
 
 You can add PDF files to the ./books/ directory in that FB Archives messages/ folder like messages/books/BOOK.pdf too.
 In addition you can export all your SMS messages from a phone to an XML and place that file in the messages/ folder
