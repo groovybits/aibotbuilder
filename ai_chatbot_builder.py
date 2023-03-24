@@ -8,6 +8,7 @@
 
 import argparse
 from concurrent.futures import ThreadPoolExecutor
+import concurrent.futures
 from contextlib import contextmanager
 import fpdf
 from halo import Halo
@@ -173,23 +174,18 @@ def compress_messages_gpt(messages, model, tokenizer, max_chars, use_gpt3=False)
 
     return compressed_text
 
-def compress_messages_nlp(messages, nlp):
-    compressed_text = ''
-    current_chars = 0
-
-    for message in messages:
-        content = message['content']
-        content_with_space = content + ' '
-        doc = nlp(content_with_space)
-
-        for sent in doc.sents:
-            sentence = sent.text
-            sentence_length = len(sentence)
-
-            compressed_text += sentence
-            current_chars += sentence_length
-
+def compress_message_nlp(message, nlp):
+    content = message['content']
+    content_with_space = content + ' '
+    doc = nlp(content_with_space)
+    compressed_text = ''.join(sent.text for sent in doc.sents)
     return compressed_text
+
+def compress_messages_nlp_parallel(messages, nlp, num_threads=os.cpu_count()):
+    with concurrent.futures.ThreadPoolExecutor(max_workers=num_threads) as executor:
+        compressed_texts = list(executor.map(lambda msg: compress_message_nlp(msg, nlp), messages))
+    return ''.join(compressed_texts)
+
 
 def write_messages_to_file(messages, output_file):
     with open(output_file, 'w', encoding='utf-8') as file:
@@ -278,7 +274,7 @@ def main():
     if use_nlp:
         nlp = spacy.load("en_core_web_sm")
         nlp.max_length = 9999999
-        compressed_text = compress_messages_nlp(messages, nlp)
+        compressed_text = compress_messages_nlp_parallel(messages, nlp)
     else:
         compressed_text = compress_messages_gpt(messages, model, tokenizer, max_chars, use_gpt3=args.use_gpt3)
     write_messages_to_file(messages, output_json_file)
