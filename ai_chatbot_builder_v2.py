@@ -124,7 +124,7 @@ def save_training_data(input_output_pairs, output_file):
     output_data = []
     with open(output_file, "w") as f:
         for pair in input_output_pairs:
-            json_line = {"prompt": f"{pair['input']}\n\n###\n\n", "completion": f" {pair['output']} END"}
+            json_line = {"prompt": f"User: {pair['input']}\n\n###\n\n", "completion": f" {pair['output']} END"}
             f.write(json.dumps(json_line) + "\n")
             output_data.append(json_line)
     return output_data
@@ -134,16 +134,18 @@ def chatbot_qa(prompt, model_name):
         model=model_name,
         prompt=prompt,
         stop=[" END"],
-        temperature=0.5,
-        max_tokens=150,
+        temperature=0.3,
+        max_tokens=100,
         top_p=1,
-        frequency_penalty=0,
-        presence_penalty=0
+        frequency_penalty=0.5,
+        presence_penalty=0.5
     )
 
     return response.choices[0].text.strip()
 
 def parse_args():
+    default_prompt = ""
+
     parser = argparse.ArgumentParser(description="Fine-tune Codex with Facebook Messenger data")
     parser.add_argument("--api_key", required=False, default="", help="Your OpenAI API key")
     parser.add_argument("--your_name", required=True, help="Your name for the chatbot")
@@ -152,7 +154,7 @@ def parse_args():
     parser.add_argument("--gpt_fine_tuned_model", default="", help="Name of the GPT fine-tuned model to use")
     parser.add_argument("--output", default="training_data.json", help="Output file for the training data")
     parser.add_argument("--t5_summarizer_model", default="", help="Summarization model for the training data: use t5-small to enable")
-    parser.add_argument("--personality", default="Use the tuning input to craft a personality of the persons answers to questions",
+    parser.add_argument("--personality", default=default_prompt,
                         help="General personality of your AI bot")
     parser.add_argument("--question", default="Tell me about yourself?", help="Question to ask your AI bot")
     parser.add_argument("--max_chars", type=int, default=50, help="Maximum number of characters for summary")
@@ -172,7 +174,7 @@ if __name__ == "__main__":
     if args.gpt_fine_tuned_model != "":
         personality_description = args.personality
         question = args.question
-        custom_prompt = f"{personality_description}User: {question}\nAI (as {your_name}):"
+        custom_prompt = f"{personality_description}User: {question}\n\n###\n\n:"
 
         response = chatbot_qa(custom_prompt, args.gpt_fine_tuned_model)
         print("\n---\n" + response + "\n---\n")
@@ -201,13 +203,13 @@ if __name__ == "__main__":
     input_output_pairs_final = save_training_data(input_output_pairs, output_file)
     print(f"Summarized training data saved to {output_file}")
 
-    cost_per_token = 0.030  # Replace with the current cost per token for the DaVinci model
+    cost_per_token = 0.003  # Replace with the current cost per token for the DaVinci model
     total_tokens = 0
     for pair in input_output_pairs_final:
         prompt_tokens = num_tokens_from_string(pair["prompt"], "gpt2")
         completion_tokens = num_tokens_from_string(pair["completion"], "gpt2")
         total_tokens += prompt_tokens + completion_tokens
-    total_cost = (float(total_tokens) / 1000) * float(cost_per_token)
+    total_cost = (float(total_tokens) / 250) * float(cost_per_token)
 
     print("Total tokens in the output file: %s will cost $%02.02f" % (total_tokens, total_cost))
     sys.exit(0)
