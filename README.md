@@ -1,7 +1,9 @@
 # aibotbuilder
 AI Bot Builder from FB Messages, SMS, PDF Files/Books
 
-Groovy.org example bots: https://groovy.org/groovy-ai-chat-bots
+Groovy.org example bots: https://groovy.org/groovy-ai-chat-bots use chatbase.co
+
+For v2 you will need a GPT login and a paid account with API access for gpt-3.
 
 There are two versions currently:
  - v1 The first is for chatbase.co as a bot builder script named ai_chatbot_builder.py.
@@ -37,6 +39,9 @@ $ openai api fine_tunes.get -i <YOUR_FINE_TUNE_JOB_ID>
 # when finished, you can reference the gpt fine_tuned_model this way
 $ ./ai_chatbot_builder_v2.py --your_name "John Doe" --api_key=`cat API_KEY.txt` \
         --gpt_fine_tuned_model babbage:organization-2023-03-25-10-52-21 --question "Tell me about yourself?"
+
+# Also you can go to the GPT Playground and see your model there
+https://platform.openai.com/playground
 ```
 
 ## How to use v1:
