@@ -47,15 +47,6 @@ def generate_summary_gpt(text, max_chars, model_name):
     summary = response.choices[0].text.strip()
     return summary
 
-def save_training_data(input_output_pairs, output_file):
-    output_data = []
-    with open(output_file, "w") as f:
-        for pair in input_output_pairs:
-            json_line = {"prompt": pair["input"], "completion": pair["output"]}
-            f.write(json.dumps(json_line) + "\n")
-            output_data.append(json_line)
-    return output_data
-
 def write_messages_to_pdf(text, output_file):
     pdf = fpdf.FPDF()
     pdf.add_page()
@@ -64,7 +55,7 @@ def write_messages_to_pdf(text, output_file):
     pdf.output(output_file)
 
 def load_facebook_data(folder):
-    messages = []
+    conversations = []
 
     for root, dirs, files in os.walk(folder):
         for file in files:
@@ -72,24 +63,60 @@ def load_facebook_data(folder):
                 with open(os.path.join(root, file), "r") as f:
                     data = json.load(f)
                     if "messages" in data:
+                        conversation = []
                         for message in data["messages"]:
-                            if "content" in message:
-                                messages.append(message["content"])
+                            if "content" in message and "sender_name" in message:
+                                conversation.append({"sender": message["sender_name"], "content": message["content"]})
+                        conversations.append(conversation)
 
-    return messages
+    return conversations
 
-def create_training_data(messages, your_name):
+def create_training_data(conversations, your_name):
     input_output_pairs = []
 
-    for i in range(1, len(messages), 2):
-        input_msg = f"{messages[i-1]}\nAI (as {your_name})"
-        output_msg = f" {messages[i]} END"
-        input_output_pairs.append({"input": input_msg, "output": output_msg})
+    for conversation in conversations:
+        input_msg, output_msg = "", ""
+        previous_sender = None
+
+        for message in conversation:
+            current_sender = message["sender"]
+            content = message["content"]
+
+            if previous_sender != current_sender:
+                if input_msg and output_msg:
+                    input_output_pairs.append({"input": input_msg, "output": output_msg})
+                    input_msg, output_msg = "", ""
+
+                if current_sender != your_name:
+                    if input_msg:
+                        input_msg += " "
+                    input_msg += content
+                else:
+                    if output_msg:
+                        output_msg += " "
+                    output_msg += content
+
+            else:
+                if current_sender != your_name:
+                    input_msg += f" {content}"
+                else:
+                    output_msg += f" {content}"
+
+            previous_sender = current_sender
+
+        if input_msg and output_msg:
+            input_output_pairs.append({"input": input_msg, "output": output_msg})
 
     return input_output_pairs
 
-def fine_tune_codex(input_output_pairs, model_name):
-    pass
+def save_training_data(input_output_pairs, output_file):
+    output_data = []
+    with open(output_file, "w") as f:
+        for pair in input_output_pairs:
+            json_line = {"prompt": f"{pair['input']}\nAI (as {your_name})", "completion": f" {pair['output']} END"}
+            f.write(json.dumps(json_line) + "\n")
+            output_data.append(json_line)
+    return output_data
 
 def chatbot_qa(prompt, model_name):
     response = openai.Completion.create(
