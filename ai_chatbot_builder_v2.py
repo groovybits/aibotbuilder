@@ -36,12 +36,15 @@ def num_tokens_from_string(string: str, encoding_name: str) -> int:
 def generate_summary_t5(text, max_chars, tokenizer, model):
     newtext = []
     for nt in text:
+        n = {}
         inputs = tokenizer.encode("summarize: " + nt['content'], return_tensors="pt", max_length=max_chars, truncation=True)
         outputs = model.generate(inputs, max_length=max_chars, min_length=25, length_penalty=2.0, num_beams=4, early_stopping=True)
         summary = tokenizer.decode(outputs[0])
-        n = {}
-        n['sender'] = nt['sender']
-        n['content'] = nt['content']
+        n['content'] = summary
+        inputs = tokenizer.encode("summarize: " + nt['sender'], return_tensors="pt", max_length=max_chars, truncation=True)
+        outputs = model.generate(inputs, max_length=max_chars, min_length=25, length_penalty=2.0, num_beams=4, early_stopping=True)
+        summary = tokenizer.decode(outputs[0])
+        n['sender'] = summary
         newtext.append(n)
     return newtext
 
@@ -49,12 +52,15 @@ def parallel_summarize_t5(msg, max_chars, tokenizer, model):
     return generate_summary_t5(msg, max_chars, tokenizer, model)
 
 def parallel_generate_summary_gpt(nt, max_chars, model_name):
+    n = {}
     prompt = f"Please summarize the following text within {max_chars} characters:\n\n{nt['content']}\n\nSummary:"
     response = openai.Completion.create(engine=model_name, prompt=prompt, max_tokens=max_chars, n=1, stop=None, temperature=0.5)
     summary = response.choices[0].text.strip()
-    n = {}
-    n['sender'] = nt['sender']
     n['content'] = summary
+    prompt = f"Please summarize the following text within {max_chars} characters:\n\n{nt['sender']}\n\nSummary:"
+    response = openai.Completion.create(engine=model_name, prompt=prompt, max_tokens=max_chars, n=1, stop=None, temperature=0.5)
+    summary = response.choices[0].text.strip()
+    n['sender'] = summary
     return n
 
 def generate_summary_gpt(text, max_chars, model_name):
@@ -147,12 +153,12 @@ def chatbot_qa(prompt, model_name):
     response = openai.Completion.create(
         model=model_name,
         prompt=prompt,
-        stop=[" END"],
-        temperature=0.5,
-        max_tokens=80,
+        temperature=0.8,
+        max_tokens=100,
         top_p=1,
-        frequency_penalty=0.5,
-        presence_penalty=0.5
+        stop=["END"],
+        frequency_penalty=0.0,
+        presence_penalty=0.0
     )
 
     return response.choices[0].text.strip()
@@ -188,7 +194,7 @@ if __name__ == "__main__":
     if args.gpt_fine_tuned_model != "":
         personality_description = args.personality
         question = args.question
-        custom_prompt = f"{personality_description}User: {question}\n\n###\n\n:"
+        custom_prompt = f"{personality_description}User: {question}\n\n###\n\n"
 
         response = chatbot_qa(custom_prompt, args.gpt_fine_tuned_model)
         print("\n---\n" + response + "\n---\n")
