@@ -4,6 +4,7 @@
 ##
 ## Christi Kennedy (C) March 2023
 ##
+## run: `openai tools fine_tunes.prepare_data -f training_data.json`
 
 import argparse
 import json
@@ -31,10 +32,11 @@ def generate_summary_gpt(text, max_chars, model_name):
     summary = response.choices[0].text.strip()
     return summary
 
-
 def save_training_data(input_output_pairs, output_file):
     with open(output_file, "w") as f:
-        json.dump(input_output_pairs, f, indent=2)
+        for pair in input_output_pairs:
+            json_line = {"prompt": pair["input"], "completion": pair["output"]}
+            f.write(json.dumps(json_line) + "\n")
 
 def load_facebook_data(folder):
     messages = []
