@@ -6,21 +6,31 @@
 ##
 ## To train GPT off the output json run:
 ##
-##  openai tools fine_tunes.prepare_data -f training_data.json`
+##  openai tools fine_tunes.prepare_data -f training_data.json
+##  openai api fine_tunes.create -t training_data_prepared.jsonl -m davinci
+##  openai api fine_tunes.follow -i <YOUR_FINE_TUNE_JOB_ID>
 ##
 ##  Read: https://platform.openai.com/docs/guides/fine-tuning
 
 
 import argparse
+import fpdf
 import json
 import openai
 import os
+import tiktoken
 from transformers import T5Tokenizer, T5ForConditionalGeneration
 import sentencepiece
 import sys
 from tqdm import tqdm
 from concurrent.futures import ProcessPoolExecutor
 
+
+def num_tokens_from_string(string: str, encoding_name: str) -> int:
+    """Returns the number of tokens in a text string."""
+    encoding = tiktoken.get_encoding(encoding_name)
+    num_tokens = len(encoding.encode(string))
+    return num_tokens
 
 def generate_summary_t5(text, max_chars, tokenizer, model):
     inputs = tokenizer.encode("summarize: " + text, return_tensors="pt", max_length=max_chars, truncation=True)
@@ -38,10 +48,20 @@ def generate_summary_gpt(text, max_chars, model_name):
     return summary
 
 def save_training_data(input_output_pairs, output_file):
+    output_data = []
     with open(output_file, "w") as f:
         for pair in input_output_pairs:
             json_line = {"prompt": pair["input"], "completion": pair["output"]}
             f.write(json.dumps(json_line) + "\n")
+            output_data.append(json_line)
+    return output_data
+
+def write_messages_to_pdf(text, output_file):
+    pdf = fpdf.FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+    pdf.multi_cell(0, 10, text)
+    pdf.output(output_file)
 
 def load_facebook_data(folder):
     messages = []
@@ -129,9 +149,19 @@ if __name__ == "__main__":
         summarized_messages = [generate_summary_gpt(msg, max_chars, args.gpt_summarizer_model) for msg in messages]
 
     input_output_pairs = create_training_data(summarized_messages, your_name)
-    save_training_data(input_output_pairs, output_file)
-
+    input_output_pairs_final = save_training_data(input_output_pairs, output_file)
     print(f"Summarized training data saved to {output_file}")
+
+    cost_per_token = 0.030  # Replace with the current cost per token for the DaVinci model
+    total_tokens = 0
+    for pair in input_output_pairs_final:
+        print(pair)
+        prompt_tokens = num_tokens_from_string(pair["prompt"], "gpt2")
+        completion_tokens = num_tokens_from_string(pair["completion"], "gpt2")
+        total_tokens += prompt_tokens + completion_tokens
+    total_cost = (float(total_tokens) / 1000) * float(cost_per_token)
+
+    print("Total tokens in the output file: %s will cost $%02.02f" % (total_tokens, total_cost))
 
     ## Only use for chatGPT
     if args.gpt_fine_tuned_model == "":
