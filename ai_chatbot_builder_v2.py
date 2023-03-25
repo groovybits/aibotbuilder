@@ -82,8 +82,8 @@ def create_training_data(messages, your_name):
     input_output_pairs = []
 
     for i in range(1, len(messages), 2):
-        input_msg = f"User: {messages[i-1]}\nAI (as {your_name}):"
-        output_msg = f"{messages[i]}"
+        input_msg = f"{messages[i]}"
+        output_msg = f"{messages[i-1]}"
         input_output_pairs.append({"input": input_msg, "output": output_msg})
 
     return input_output_pairs
@@ -93,7 +93,7 @@ def fine_tune_codex(input_output_pairs, model_name):
 
 def chatbot_qa(prompt, model_name):
     response = openai.Completion.create(
-        engine=model_name,
+        model=model_name,
         prompt=prompt,
         temperature=0.5,
         max_tokens=150,
