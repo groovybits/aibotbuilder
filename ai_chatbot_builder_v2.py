@@ -18,6 +18,7 @@ import fpdf
 import json
 import openai
 import os
+import textwrap
 import tiktoken
 from transformers import T5Tokenizer, T5ForConditionalGeneration
 import sentencepiece
@@ -71,7 +72,11 @@ def load_facebook_data(folder):
 
     return conversations
 
-def create_training_data(conversations, your_name):
+def split_long_message(message, max_length):
+    wrapped_lines = textwrap.wrap(message, max_length)
+    return wrapped_lines
+
+def create_training_data(conversations, your_name, max_length=80):
     input_output_pairs = []
 
     for conversation in conversations:
@@ -82,27 +87,33 @@ def create_training_data(conversations, your_name):
             current_sender = message["sender"]
             content = message["content"]
 
-            if previous_sender != current_sender:
-                if input_msg and output_msg:
-                    input_output_pairs.append({"input": input_msg, "output": output_msg})
-                    input_msg, output_msg = "", ""
-
-                if current_sender != your_name:
-                    if input_msg:
-                        input_msg += " "
-                    input_msg += content
-                else:
-                    if output_msg:
-                        output_msg += " "
-                    output_msg += content
-
+            if len(content) > max_length:
+                content_lines = split_long_message(content, max_length)
             else:
-                if current_sender != your_name:
-                    input_msg += f" {content}"
-                else:
-                    output_msg += f" {content}"
+                content_lines = [content]
 
-            previous_sender = current_sender
+            for content_line in content_lines:
+                if previous_sender != current_sender:
+                    if input_msg and output_msg:
+                        input_output_pairs.append({"input": input_msg, "output": output_msg})
+                        input_msg, output_msg = "", ""
+
+                    if current_sender != your_name:
+                        if input_msg:
+                            input_msg += " "
+                        input_msg += content_line
+                    else:
+                        if output_msg:
+                            output_msg += " "
+                        output_msg += content_line
+
+                else:
+                    if current_sender != your_name:
+                        input_msg += f" {content_line}"
+                    else:
+                        output_msg += f" {content_line}"
+
+                previous_sender = current_sender
 
         if input_msg and output_msg:
             input_output_pairs.append({"input": input_msg, "output": output_msg})
@@ -113,7 +124,7 @@ def save_training_data(input_output_pairs, output_file):
     output_data = []
     with open(output_file, "w") as f:
         for pair in input_output_pairs:
-            json_line = {"prompt": f"{pair['input']}\nAI (as {your_name})", "completion": f" {pair['output']} END"}
+            json_line = {"prompt": f"{pair['input']}\n\n###\n\n", "completion": f" {pair['output']} END"}
             f.write(json.dumps(json_line) + "\n")
             output_data.append(json_line)
     return output_data
@@ -136,7 +147,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Fine-tune Codex with Facebook Messenger data")
     parser.add_argument("--api_key", required=False, default="", help="Your OpenAI API key")
     parser.add_argument("--your_name", required=True, help="Your name for the chatbot")
-    parser.add_argument("--folder", required=True, help="Path to the folder containing Facebook data")
+    parser.add_argument("--folder", required=False, default="./", help="Path to the folder containing Facebook data")
     parser.add_argument("--gpt_summarizer_model", default="", help="Name of the GPT summarization model to use")
     parser.add_argument("--gpt_fine_tuned_model", default="", help="Name of the GPT fine-tuned model to use")
     parser.add_argument("--output", default="training_data.json", help="Output file for the training data")
