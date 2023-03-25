@@ -86,6 +86,9 @@ def parse_args():
     parser.add_argument("--gpt_fine_tuned_model", default="", help="Name of the GPT fine-tuned model to use")
     parser.add_argument("--output", default="training_data.json", help="Output file for the training data")
     parser.add_argument("--t5_summarizer_model", default="", help="Summarization model for the training data: use t5-small to enable")
+    parser.add_argument("--personality", default="Use the tuning input to craft a personality of the persons answers to questions",
+                        help="General personality of your AI bot")
+    parser.add_argument("--question", default="Tell me about yourself?", help="Question to ask your AI bot")
     parser.add_argument("--max_chars", type=int, default=50, help="Maximum number of characters for summary")
 
     return parser.parse_args()
@@ -129,7 +132,10 @@ if __name__ == "__main__":
 
     # Test the chatbot with a custom prompt
     fine_tune_codex(input_output_pairs, args.gpt_fine_tuned_model)
-    custom_prompt = f"User: Tell me about yourself?\nAI (as {your_name}):"
+
+    personality_description = args.personality
+    question = args.question
+    custom_prompt = f"{personality_description}User: {question}\nAI (as {your_name}):"
     response = chatbot_qa(custom_prompt, args.gpt_fine_tuned_model)
-    print(response)
+    print("\n---\n" + response + "\n---\n")
 
