@@ -134,8 +134,8 @@ def chatbot_qa(prompt, model_name):
         model=model_name,
         prompt=prompt,
         stop=[" END"],
-        temperature=0.3,
-        max_tokens=100,
+        temperature=0.5,
+        max_tokens=80,
         top_p=1,
         frequency_penalty=0.5,
         presence_penalty=0.5
