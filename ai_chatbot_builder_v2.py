@@ -4,7 +4,12 @@
 ##
 ## Christi Kennedy (C) March 2023
 ##
-## run: `openai tools fine_tunes.prepare_data -f training_data.json`
+## To train GPT off the output json run:
+##
+##  openai tools fine_tunes.prepare_data -f training_data.json`
+##
+##  Read: https://platform.openai.com/docs/guides/fine-tuning
+
 
 import argparse
 import json
