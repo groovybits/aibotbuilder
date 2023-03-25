@@ -106,7 +106,7 @@ def chatbot_qa(prompt, model_name):
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Fine-tune Codex with Facebook Messenger data")
-    parser.add_argument("--api_key", required=True, help="Your OpenAI API key")
+    parser.add_argument("--api_key", required=False, default="", help="Your OpenAI API key")
     parser.add_argument("--your_name", required=True, help="Your name for the chatbot")
     parser.add_argument("--folder", required=True, help="Path to the folder containing Facebook data")
     parser.add_argument("--gpt_summarizer_model", default="", help="Name of the GPT summarization model to use")
@@ -155,7 +155,6 @@ if __name__ == "__main__":
     cost_per_token = 0.030  # Replace with the current cost per token for the DaVinci model
     total_tokens = 0
     for pair in input_output_pairs_final:
-        print(pair)
         prompt_tokens = num_tokens_from_string(pair["prompt"], "gpt2")
         completion_tokens = num_tokens_from_string(pair["completion"], "gpt2")
         total_tokens += prompt_tokens + completion_tokens
