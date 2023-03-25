@@ -144,7 +144,7 @@ def save_training_data(input_output_pairs, output_file):
     output_data = []
     with open(output_file, "w") as f:
         for pair in input_output_pairs:
-            json_line = {"prompt": f"User: {pair['input']}\n\n###\n\n", "completion": f" {pair['output']} END"}
+            json_line = {"prompt": f"User: {pair['input']}\n\n###\n\n", "completion": f" {pair['output']}\n\nEND\n\n"}
             f.write(json.dumps(json_line) + "\n")
             output_data.append(json_line)
     return output_data
