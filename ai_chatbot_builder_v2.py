@@ -82,8 +82,8 @@ def create_training_data(messages, your_name):
     input_output_pairs = []
 
     for i in range(1, len(messages), 2):
-        input_msg = f"{messages[i]}"
-        output_msg = f"{messages[i-1]}"
+        input_msg = f"{messages[i-1]}\nAI (as {your_name})"
+        output_msg = f" {messages[i]} END"
         input_output_pairs.append({"input": input_msg, "output": output_msg})
 
     return input_output_pairs
@@ -95,6 +95,7 @@ def chatbot_qa(prompt, model_name):
     response = openai.Completion.create(
         model=model_name,
         prompt=prompt,
+        stop=[" END"],
         temperature=0.5,
         max_tokens=150,
         top_p=1,
@@ -129,6 +130,16 @@ if __name__ == "__main__":
     output_file = args.output
     max_chars = args.max_chars
 
+    ## Only use for chatGPT
+    if args.gpt_fine_tuned_model != "":
+        personality_description = args.personality
+        question = args.question
+        custom_prompt = f"{personality_description}User: {question}\nAI (as {your_name}):"
+
+        response = chatbot_qa(custom_prompt, args.gpt_fine_tuned_model)
+        print("\n---\n" + response + "\n---\n")
+        sys.exit(0)
+
     messages = load_facebook_data(folder)
 
     # T5
@@ -161,17 +172,5 @@ if __name__ == "__main__":
     total_cost = (float(total_tokens) / 1000) * float(cost_per_token)
 
     print("Total tokens in the output file: %s will cost $%02.02f" % (total_tokens, total_cost))
-
-    ## Only use for chatGPT
-    if args.gpt_fine_tuned_model == "":
-        sys.exit(0)
-
-    # Test the chatbot with a custom prompt
-    fine_tune_codex(input_output_pairs, args.gpt_fine_tuned_model)
-
-    personality_description = args.personality
-    question = args.question
-    custom_prompt = f"{personality_description}User: {question}\nAI (as {your_name}):"
-    response = chatbot_qa(custom_prompt, args.gpt_fine_tuned_model)
-    print("\n---\n" + response + "\n---\n")
+    sys.exit(0)
 
