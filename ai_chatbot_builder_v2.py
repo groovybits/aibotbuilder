@@ -34,10 +34,16 @@ def num_tokens_from_string(string: str, encoding_name: str) -> int:
     return num_tokens
 
 def generate_summary_t5(text, max_chars, tokenizer, model):
-    inputs = tokenizer.encode("summarize: " + text, return_tensors="pt", max_length=max_chars, truncation=True)
-    outputs = model.generate(inputs, max_length=max_chars, min_length=25, length_penalty=2.0, num_beams=4, early_stopping=True)
-    summary = tokenizer.decode(outputs[0])
-    return summary
+    newtext = []
+    for nt in text:
+        inputs = tokenizer.encode("summarize: " + nt['content'], return_tensors="pt", max_length=max_chars, truncation=True)
+        outputs = model.generate(inputs, max_length=max_chars, min_length=25, length_penalty=2.0, num_beams=4, early_stopping=True)
+        summary = tokenizer.decode(outputs[0])
+        n = {}
+        n['sender'] = nt['sender']
+        n['content'] = nt['content']
+        newtext.append(n)
+    return newtext
 
 def parallel_summarize_t5(msg, max_chars, tokenizer, model):
     return generate_summary_t5(msg, max_chars, tokenizer, model)
