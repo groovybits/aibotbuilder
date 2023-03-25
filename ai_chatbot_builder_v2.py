@@ -82,8 +82,10 @@ def parse_args():
     parser.add_argument("--api_key", required=True, help="Your OpenAI API key")
     parser.add_argument("--your_name", required=True, help="Your name for the chatbot")
     parser.add_argument("--folder", required=True, help="Path to the folder containing Facebook data")
-    parser.add_argument("--model_name", default="text-davinci-002", help="Name of the fine-tuned model or default model to use")
+    parser.add_argument("--gpt_summarizer_model", default="", help="Name of the GPT summarization model to use")
+    parser.add_argument("--gpt_fine_tuned_model", default="", help="Name of the GPT fine-tuned model to use")
     parser.add_argument("--output", default="training_data.json", help="Output file for the training data")
+    parser.add_argument("--t5_summarizer_model", default="", help="Summarization model for the training data: use t5-small to enable")
     parser.add_argument("--max_chars", type=int, default=50, help="Maximum number of characters for summary")
 
     return parser.parse_args()
@@ -94,23 +96,27 @@ if __name__ == "__main__":
     openai.api_key = args.api_key
     your_name = args.your_name
     folder = args.folder
-    fine_tuned_model_name = args.model_name
     output_file = args.output
     max_chars = args.max_chars
 
     messages = load_facebook_data(folder)
 
     # T5
-    tokenizer = T5Tokenizer.from_pretrained("t5-small", model_max_length=max_chars)
-    model = T5ForConditionalGeneration.from_pretrained("t5-small")
-    with ProcessPoolExecutor() as executor:
-        summarized_messages = list(tqdm(executor.map(parallel_summarize_t5,
-                                                     messages, [max_chars] * len(messages),
-                                                     [tokenizer] * len(messages), [model] * len(messages)),
-                                        total=len(messages), desc="Summarizing messages"))
-
-    # chatGPT
-    #summarized_messages = messages #[generate_summary_gpt(msg, max_chars, args.model_name) for msg in messages]
+    if args.gpt_summarizer_model == "":
+        if args.t5_summarizer_model == "":
+            ## no summaries
+            summarized_messages = messages
+        else:
+            tokenizer = T5Tokenizer.from_pretrained(args.t5_summarizer_model, model_max_length=max_chars)
+            model = T5ForConditionalGeneration.from_pretrained(args.t5_summarizer_model)
+            with ProcessPoolExecutor() as executor:
+                summarized_messages = list(tqdm(executor.map(parallel_summarize_t5,
+                                                             messages, [max_chars] * len(messages),
+                                                             [tokenizer] * len(messages), [model] * len(messages)),
+                                                total=len(messages), desc="Summarizing messages"))
+    else:
+        # chatGPT
+        summarized_messages = [generate_summary_gpt(msg, max_chars, args.gpt_summarizer_model) for msg in messages]
 
     input_output_pairs = create_training_data(summarized_messages, your_name)
     save_training_data(input_output_pairs, output_file)
@@ -118,11 +124,12 @@ if __name__ == "__main__":
     print(f"Summarized training data saved to {output_file}")
 
     ## Only use for chatGPT
-    sys.exit(0)
+    if args.gpt_fine_tuned_model == "":
+        sys.exit(0)
 
     # Test the chatbot with a custom prompt
-    fine_tune_codex(input_output_pairs, fine_tuned_model_name)
-    custom_prompt = f"User: What's your favorite color?\nAI (as {your_name}):"
-    response = chatbot_qa(custom_prompt, fine_tuned_model_name)
+    fine_tune_codex(input_output_pairs, args.gpt_fine_tuned_model)
+    custom_prompt = f"User: Tell me about yourself?\nAI (as {your_name}):"
+    response = chatbot_qa(custom_prompt, args.gpt_fine_tuned_model)
     print(response)
 
