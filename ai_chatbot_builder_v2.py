@@ -1,0 +1,128 @@
+#!/usr/local/bin/python3
+
+## Rewrite of v1 evolving the way we work
+##
+## Christi Kennedy (C) March 2023
+##
+
+import argparse
+import json
+import openai
+import os
+from transformers import T5Tokenizer, T5ForConditionalGeneration
+import sentencepiece
+import sys
+from tqdm import tqdm
+from concurrent.futures import ProcessPoolExecutor
+
+
+def generate_summary_t5(text, max_chars, tokenizer, model):
+    inputs = tokenizer.encode("summarize: " + text, return_tensors="pt", max_length=max_chars, truncation=True)
+    outputs = model.generate(inputs, max_length=max_chars, min_length=25, length_penalty=2.0, num_beams=4, early_stopping=True)
+    summary = tokenizer.decode(outputs[0])
+    return summary
+
+def parallel_summarize_t5(msg, max_chars, tokenizer, model):
+    return generate_summary_t5(msg, max_chars, tokenizer, model)
+
+def generate_summary_gpt(text, max_chars, model_name):
+    prompt = f"Please summarize the following text within {max_chars} characters:\n\n{text}\n\nSummary:"
+    response = openai.Completion.create(engine=model_name, prompt=prompt, max_tokens=max_chars, n=1, stop=None, temperature=0.5)
+    summary = response.choices[0].text.strip()
+    return summary
+
+
+def save_training_data(input_output_pairs, output_file):
+    with open(output_file, "w") as f:
+        json.dump(input_output_pairs, f, indent=2)
+
+def load_facebook_data(folder):
+    messages = []
+
+    for root, dirs, files in os.walk(folder):
+        for file in files:
+            if file.endswith(".json"):
+                with open(os.path.join(root, file), "r") as f:
+                    data = json.load(f)
+                    if "messages" in data:
+                        for message in data["messages"]:
+                            if "content" in message:
+                                messages.append(message["content"])
+
+    return messages
+
+def create_training_data(messages, your_name):
+    input_output_pairs = []
+
+    for i in range(1, len(messages), 2):
+        input_msg = f"User: {messages[i-1]}\nAI (as {your_name}):"
+        output_msg = f"{messages[i]}"
+        input_output_pairs.append({"input": input_msg, "output": output_msg})
+
+    return input_output_pairs
+
+def fine_tune_codex(input_output_pairs, model_name):
+    pass
+
+def chatbot_qa(prompt, model_name):
+    response = openai.Completion.create(
+        engine=model_name,
+        prompt=prompt,
+        temperature=0.5,
+        max_tokens=150,
+        top_p=1,
+        frequency_penalty=0,
+        presence_penalty=0
+    )
+
+    return response.choices[0].text.strip()
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Fine-tune Codex with Facebook Messenger data")
+    parser.add_argument("--api_key", required=True, help="Your OpenAI API key")
+    parser.add_argument("--your_name", required=True, help="Your name for the chatbot")
+    parser.add_argument("--folder", required=True, help="Path to the folder containing Facebook data")
+    parser.add_argument("--model_name", default="text-davinci-002", help="Name of the fine-tuned model or default model to use")
+    parser.add_argument("--output", default="training_data.json", help="Output file for the training data")
+    parser.add_argument("--max_chars", type=int, default=50, help="Maximum number of characters for summary")
+
+    return parser.parse_args()
+
+if __name__ == "__main__":
+    args = parse_args()
+
+    openai.api_key = args.api_key
+    your_name = args.your_name
+    folder = args.folder
+    fine_tuned_model_name = args.model_name
+    output_file = args.output
+    max_chars = args.max_chars
+
+    messages = load_facebook_data(folder)
+
+    # T5
+    tokenizer = T5Tokenizer.from_pretrained("t5-small", model_max_length=max_chars)
+    model = T5ForConditionalGeneration.from_pretrained("t5-small")
+    with ProcessPoolExecutor() as executor:
+        summarized_messages = list(tqdm(executor.map(parallel_summarize_t5,
+                                                     messages, [max_chars] * len(messages),
+                                                     [tokenizer] * len(messages), [model] * len(messages)),
+                                        total=len(messages), desc="Summarizing messages"))
+
+    # chatGPT
+    #summarized_messages = messages #[generate_summary_gpt(msg, max_chars, args.model_name) for msg in messages]
+
+    input_output_pairs = create_training_data(summarized_messages, your_name)
+    save_training_data(input_output_pairs, output_file)
+
+    print(f"Summarized training data saved to {output_file}")
+
+    ## Only use for chatGPT
+    sys.exit(0)
+
+    # Test the chatbot with a custom prompt
+    fine_tune_codex(input_output_pairs, fine_tuned_model_name)
+    custom_prompt = f"User: What's your favorite color?\nAI (as {your_name}):"
+    response = chatbot_qa(custom_prompt, fine_tuned_model_name)
+    print(response)
+

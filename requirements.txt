@@ -6,3 +6,5 @@ fpdf
 tqdm
 halo
 openapi
+concurrent
+import sentencepiece
