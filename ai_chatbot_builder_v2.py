@@ -48,11 +48,19 @@ def generate_summary_t5(text, max_chars, tokenizer, model):
 def parallel_summarize_t5(msg, max_chars, tokenizer, model):
     return generate_summary_t5(msg, max_chars, tokenizer, model)
 
-def generate_summary_gpt(text, max_chars, model_name):
-    prompt = f"Please summarize the following text within {max_chars} characters:\n\n{text}\n\nSummary:"
+def parallel_generate_summary_gpt(nt, max_chars, model_name):
+    prompt = f"Please summarize the following text within {max_chars} characters:\n\n{nt['content']}\n\nSummary:"
     response = openai.Completion.create(engine=model_name, prompt=prompt, max_tokens=max_chars, n=1, stop=None, temperature=0.5)
     summary = response.choices[0].text.strip()
-    return summary
+    n = {}
+    n['sender'] = nt['sender']
+    n['content'] = summary
+    return n
+
+def generate_summary_gpt(text, max_chars, model_name):
+    with ProcessPoolExecutor() as executor:
+        newtext = list(tqdm(executor.map(parallel_generate_summary_gpt, text, [max_chars] * len(text), [model_name] * len(text)), total=len(text), desc="Summarizing messages"))
+    return newtext
 
 def write_messages_to_pdf(text, output_file):
     pdf = fpdf.FPDF()
@@ -152,7 +160,7 @@ def chatbot_qa(prompt, model_name):
 def parse_args():
     default_prompt = ""
 
-    parser = argparse.ArgumentParser(description="Fine-tune Codex with Facebook Messenger data")
+    parser = argparse.ArgumentParser(description="Fine-tune GPT Models with Facebook Messenger data")
     parser.add_argument("--api_key", required=False, default="", help="Your OpenAI API key")
     parser.add_argument("--your_name", required=True, help="Your name for the chatbot")
     parser.add_argument("--folder", required=False, default="./", help="Path to the folder containing Facebook data")
@@ -203,7 +211,7 @@ if __name__ == "__main__":
                                                 total=len(messages), desc="Summarizing messages"))
     else:
         # chatGPT
-        summarized_messages = [generate_summary_gpt(msg, max_chars, args.gpt_summarizer_model) for msg in messages]
+        summarized_messages = generate_summary_gpt([msg for conv in messages for msg in conv if 'content' in msg], max_chars, args.gpt_summarizer_model)
 
     input_output_pairs = create_training_data(summarized_messages, your_name)
     input_output_pairs_final = save_training_data(input_output_pairs, output_file)
