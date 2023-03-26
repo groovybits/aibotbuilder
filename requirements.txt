@@ -8,3 +8,4 @@ halo
 openapi
 concurrent
 import sentencepiece
+nltk
