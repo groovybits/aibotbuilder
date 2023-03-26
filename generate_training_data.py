@@ -2,20 +2,15 @@ import os
 import json
 import re
 import sys
+import spacy
 from fpdf import FPDF
-from nltk.corpus import stopwords
-from nltk.tokenize import word_tokenize
-from nltk import download
 
-download("stopwords")
-download("punkt")
+nlp = spacy.load("en_core_web_sm")
 
-stop_words = set(stopwords.words("english"))
-
-def remove_stop_words_and_links(text):
-    word_tokens = word_tokenize(text)
-    filtered_text = [w for w in word_tokens if not w in stop_words and not re.match(r"http\S+", w)]
-    return " ".join(filtered_text)
+def clean_text(text):
+    doc = nlp(text)
+    cleaned_tokens = [token.lemma_.lower() for token in doc if token.is_alpha and not token.is_stop]
+    return " ".join(cleaned_tokens)
 
 def process_conversation(conversation, main_person, output_dir):
     participants = [p["name"] for p in conversation["participants"]]
@@ -23,19 +18,32 @@ def process_conversation(conversation, main_person, output_dir):
         for message in conversation["messages"]:
             if "content" in message:
                 sender_name = message["sender_name"]
-                cleaned_content = remove_stop_words_and_links(message["content"])
+                cleaned_content = clean_text(message["content"])
 
                 pdf_filename = os.path.join(output_dir, f"{sender_name}_chatbot.pdf")
                 txt_filename = os.path.join(output_dir, f"{sender_name}_chatbot.txt")
+                json_filename = os.path.join(output_dir, f"{sender_name}_chatbot.json")
+
                 pdf = FPDF()
                 pdf.add_page()
                 pdf.set_font("Arial", size=12)
                 pdf.multi_cell(0, 10, txt=cleaned_content)
+                pdf.output(pdf_filename)
 
                 with open(txt_filename, "a", encoding="utf-8") as txt_file:
                     txt_file.write(cleaned_content + "\n\n")
 
-                pdf.output(pdf_filename)
+                json_data = {
+                    "prompt": f"{main_person}: {cleaned_content}\n\n###\n\n",
+                    "completion": f" {sender_name}: {cleaned_content} END"
+                }
+
+                with open(json_filename, "a", encoding="utf-8") as json_file:
+                    json.dump(json_data, json_file)
+                    json_file.write("\n")
+
+                with open("training_data.txt", "a", encoding="utf-8") as f:
+                    f.write(f"{main_person}: {cleaned_content}\n\n###\n\n {sender_name}: {cleaned_content}\n")
 
 def main(messenger_data_dir, main_person):
     output_dir = "output"
