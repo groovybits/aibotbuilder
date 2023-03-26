@@ -20,6 +20,9 @@ def process_conversation(conversation, main_person, output_dir):
                 sender_name = message["sender_name"]
                 cleaned_content = clean_text(message["content"])
 
+                # split cleaned_content into lines
+                lines = cleaned_content.split("\n")
+
                 pdf_filename = os.path.join(output_dir, f"{sender_name}_chatbot.pdf")
                 txt_filename = os.path.join(output_dir, f"{sender_name}_chatbot.txt")
                 json_filename = os.path.join(output_dir, f"{sender_name}_chatbot.json")
@@ -27,7 +30,11 @@ def process_conversation(conversation, main_person, output_dir):
                 pdf = FPDF()
                 pdf.add_page()
                 pdf.set_font("Arial", size=12)
-                pdf.multi_cell(0, 10, txt=cleaned_content)
+
+                # pass the lines to pdf.multi_cell()
+                for line in lines:
+                    pdf.multi_cell(0, 10, txt=line)
+
                 pdf.output(pdf_filename)
 
                 with open(txt_filename, "a", encoding="utf-8") as txt_file:
