@@ -17,6 +17,7 @@
 
 ## WIP This is an experiment / research into video identification
 
+import concurrent.futures
 import os
 import json
 import argparse
@@ -26,10 +27,67 @@ import glob
 import ffmpeg
 import np
 from PIL import Image
+import pytesseract
 from imagehash import phash
 import subprocess
 from scipy.spatial.distance import hamming
 import sys
+
+def get_video_duration(video_path):
+    cap = cv2.VideoCapture(video_path)
+    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    fps = int(cap.get(cv2.CAP_PROP_FPS))
+    duration = frame_count / fps
+    cap.release()
+    return duration
+
+def process_frame(i, source_frame_path, derivative_frame_path, vmaf_score, yolov3_weights, yolov3_cfg, coco_names):
+    source_frame = cv2.imread(source_frame_path)
+    derivative_frame = cv2.imread(derivative_frame_path)
+    source_frame_phash = compute_image_phash(source_frame_path)
+    derivative_frame_phash = compute_image_phash(derivative_frame_path)
+    source_phash_bin = bin(int(source_frame_phash, 16))[2:].zfill(64)
+    derivative_phash_bin = bin(int(derivative_frame_phash, 16))[2:].zfill(64)
+    hamming_distance = sum([1 for x, y in zip(source_phash_bin, derivative_phash_bin) if x != y])
+
+    source_frame_description = recognize_objects(
+                                source_frame,
+                                yolov3_weights,
+                                yolov3_cfg,
+                                coco_names,
+                            )
+
+    source_frame_text = extract_text(source_frame)
+
+    derivative_frame_description = recognize_objects(
+                                derivative_frame,
+                                yolov3_weights,
+                                yolov3_cfg,
+                                coco_names,
+                            )
+
+    derivative_frame_text = extract_text(derivative_frame)
+
+    return {
+        'frame': i,
+        'source_frame_phash': source_frame_phash,
+        'derivative_frame_phash': derivative_frame_phash,
+        'hamming_distance': hamming_distance,
+        'source_frame_description': source_frame_description,
+        'source_frame_text': source_frame_text.strip(),
+        'derivative_frame_description': derivative_frame_description,
+        'derivative_frame_text': derivative_frame_text.strip(),
+        'vmaf_score': vmaf_score,
+    }
+
+def extract_text(image):
+    # Convert the OpenCV image to a PIL image
+    pil_image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+
+    # Extract text from the image using pytesseract
+    text = pytesseract.image_to_string(pil_image)
+
+    return text
 
 def compute_image_phash(image_path):
     image = Image.open(image_path)
@@ -168,42 +226,28 @@ def process_videos(source_video_path, derivative_video_path, output_dir, start_s
     # Analyzing frames
     print("Analyzing frames...")
 
-    for i, (source_frame_path, derivative_frame_path) in enumerate(zip(source_frame_paths, derivative_frame_paths)):
-        source_frame = cv2.imread(source_frame_path)
-        derivative_frame = cv2.imread(derivative_frame_path)
-        source_frame_phash = compute_image_phash(source_frame_path)
-        derivative_frame_phash = compute_image_phash(derivative_frame_path)
-        source_phash_bin = bin(int(source_frame_phash, 16))[2:].zfill(64)
-        derivative_phash_bin = bin(int(derivative_frame_phash, 16))[2:].zfill(64)
-        hamming_distance = sum([1 for x, y in zip(source_phash_bin, derivative_phash_bin) if x != y])
+    # In the process_videos function, replace the for loop with the following code:
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        futures = [
+            executor.submit(
+                process_frame,
+                i,
+                source_frame_path,
+                derivative_frame_path,
+                vmaf_scores[i],
+                '/Users/christi/src/aibotbuilder/yolov3.weights',
+                '/Users/christi/src/aibotbuilder/yolov3.cfg',
+                '/Users/christi/src/aibotbuilder/coco.names',
+            )
+            for i, (source_frame_path, derivative_frame_path) in enumerate(zip(source_frame_paths, derivative_frame_paths))
+        ]
 
-        source_frame_description = recognize_objects(
-                                    source_frame,
-                                    '/Users/christi/src/aibotbuilder/yolov3.weights',
-                                    '/Users/christi/src/aibotbuilder/yolov3.cfg',
-                                    '/Users/christi/src/aibotbuilder/coco.names',
-                                )
-        derivative_frame_description = recognize_objects(
-                                    derivative_frame,
-                                    '/Users/christi/src/aibotbuilder/yolov3.weights',
-                                    '/Users/christi/src/aibotbuilder/yolov3.cfg',
-                                    '/Users/christi/src/aibotbuilder/coco.names',
-                                )
+        for future in concurrent.futures.as_completed(futures):
+            result = future.result()
+            results.append(result)
+            print(f"Processed frame {result['frame']}")
 
-        results.append({
-            'frame': i,
-            'source_frame_phash': source_frame_phash,
-            'derivative_frame_phash': derivative_frame_phash,
-            'hamming_distance': hamming_distance,
-            'source_frame_description': source_frame_description,
-            'derivative_frame_description': derivative_frame_description,
-            'vmaf_score': vmaf_scores[i],
-        })
-
-        # Display progress
-        progress = (i + 1) / total_frames * 100
-        sys.stdout.write(f"\rProgress: {progress:.2f}%")
-        sys.stdout.flush()
+    results.sort(key=lambda x: x['frame'])  # Sort the results by frame number
 
     print("\nSaving results to JSON file...")
     # Save results to a JSON file
