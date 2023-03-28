@@ -77,9 +77,8 @@ options:
 ## How to use v2:
 
 ```
-usage: ai_chatbot_builder_v2.py [-h] [--api_key API_KEY] --your_name YOUR_NAME [--folder FOLDER] [--gpt_summarizer_model GPT_SUMMARIZER_MODEL]
-                                [--gpt_fine_tuned_model GPT_FINE_TUNED_MODEL] [--output OUTPUT] [--t5_summarizer_model T5_SUMMARIZER_MODEL] [--personality PERSONALITY]
-                                [--question QUESTION] [--max_chars MAX_CHARS]
+usage: ai_chatbot_builder_v2.py [-h] [--api_key API_KEY] --your_name YOUR_NAME [--folder FOLDER] [--gpt_fine_tuned_model GPT_FINE_TUNED_MODEL] [--output OUTPUT]
+                                [--personality PERSONALITY] [--question QUESTION] [--max_chars MAX_CHARS]
 
 Fine-tune GPT Models with Facebook Messenger data
 
@@ -89,13 +88,9 @@ options:
   --your_name YOUR_NAME
                         Your name for the chatbot
   --folder FOLDER       Path to the folder containing Facebook data
-  --gpt_summarizer_model GPT_SUMMARIZER_MODEL
-                        Name of the GPT summarization model to use
   --gpt_fine_tuned_model GPT_FINE_TUNED_MODEL
                         Name of the GPT fine-tuned model to use
   --output OUTPUT       Output file for the training data
-  --t5_summarizer_model T5_SUMMARIZER_MODEL
-                        Summarization model for the training data: use t5-small to enable
   --personality PERSONALITY
                         General personality of your AI bot
   --question QUESTION   Question to ask your AI bot

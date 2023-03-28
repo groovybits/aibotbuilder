@@ -1,6 +1,7 @@
 #!/usr/local/bin/python3
 
-## Rewrite of v1 evolving the way we work
+## Read in FB messages and train GPT-3 to respond to them
+## Create role playing game of your FB messages friends as NPCs
 ##
 ## Christi Kennedy (C) March 2023
 ##
@@ -18,14 +19,10 @@ import fpdf
 import json
 import openai
 import os
+import re
 import textwrap
 import tiktoken
-from transformers import T5Tokenizer, T5ForConditionalGeneration
-import sentencepiece
 import sys
-from tqdm import tqdm
-from concurrent.futures import ProcessPoolExecutor
-
 
 def num_tokens_from_string(string: str, encoding_name: str) -> int:
     """Returns the number of tokens in a text string."""
@@ -33,40 +30,6 @@ def num_tokens_from_string(string: str, encoding_name: str) -> int:
     num_tokens = len(encoding.encode(string))
     return num_tokens
 
-def generate_summary_t5(text, max_chars, tokenizer, model):
-    newtext = []
-    for nt in text:
-        n = {}
-        inputs = tokenizer.encode("summarize: " + nt['content'], return_tensors="pt", max_length=max_chars, truncation=True)
-        outputs = model.generate(inputs, max_length=max_chars, min_length=25, length_penalty=2.0, num_beams=4, early_stopping=True)
-        summary = tokenizer.decode(outputs[0])
-        n['content'] = summary
-        inputs = tokenizer.encode("summarize: " + nt['sender'], return_tensors="pt", max_length=max_chars, truncation=True)
-        outputs = model.generate(inputs, max_length=max_chars, min_length=25, length_penalty=2.0, num_beams=4, early_stopping=True)
-        summary = tokenizer.decode(outputs[0])
-        n['sender'] = summary
-        newtext.append(n)
-    return newtext
-
-def parallel_summarize_t5(msg, max_chars, tokenizer, model):
-    return generate_summary_t5(msg, max_chars, tokenizer, model)
-
-def parallel_generate_summary_gpt(nt, max_chars, model_name):
-    n = {}
-    prompt = f"Please summarize the following text within {max_chars} characters:\n\n{nt['content']}\n\nSummary:"
-    response = openai.Completion.create(engine=model_name, prompt=prompt, max_tokens=max_chars, n=1, stop=None, temperature=0.5)
-    summary = response.choices[0].text.strip()
-    n['content'] = summary
-    prompt = f"Please summarize the following text within {max_chars} characters:\n\n{nt['sender']}\n\nSummary:"
-    response = openai.Completion.create(engine=model_name, prompt=prompt, max_tokens=max_chars, n=1, stop=None, temperature=0.5)
-    summary = response.choices[0].text.strip()
-    n['sender'] = summary
-    return n
-
-def generate_summary_gpt(text, max_chars, model_name):
-    with ProcessPoolExecutor() as executor:
-        newtext = list(tqdm(executor.map(parallel_generate_summary_gpt, text, [max_chars] * len(text), [model_name] * len(text)), total=len(text), desc="Summarizing messages"))
-    return newtext
 
 def write_messages_to_pdf(text, output_file):
     pdf = fpdf.FPDF()
@@ -96,7 +59,16 @@ def split_long_message(message, max_length):
     wrapped_lines = textwrap.wrap(message, max_length)
     return wrapped_lines
 
-def create_training_data(conversations, your_name, max_length=80):
+def remove_non_text_and_urls(input_string):
+    # Remove URLs
+    input_string = re.sub(r'http\S+|www\S+', '', input_string)
+
+    # Remove non-text characters
+    cleaned_string = ''.join(char for char in input_string if char.isalnum() or char.isspace())
+
+    return cleaned_string
+
+def create_training_data(conversations, your_name, max_length=1000):
     input_output_pairs = []
 
     for conversation in conversations:
@@ -115,7 +87,9 @@ def create_training_data(conversations, your_name, max_length=80):
             for content_line in content_lines:
                 if previous_sender != current_sender:
                     if input_msg and output_msg:
-                        input_output_pairs.append({"input": input_msg, "output": output_msg})
+                        input_msg = remove_non_text_and_urls(input_msg)
+                        output_msg = remove_non_text_and_urls(output_msg)
+                        input_output_pairs.append({"input": previous_sender + ": " + input_msg, "output": current_sender + ": " + output_msg})
                         input_msg, output_msg = "", ""
 
                     if current_sender != your_name:
@@ -144,7 +118,7 @@ def save_training_data(input_output_pairs, output_file):
     output_data = []
     with open(output_file, "w") as f:
         for pair in input_output_pairs:
-            json_line = {"prompt": f"User: {pair['input']}\n\n###\n\n", "completion": f" {pair['output']}\n\nEND\n\n"}
+            json_line = {"prompt": f"{pair['input']}\n\n###\n\n", "completion": f" {pair['output']}\nEND"}
             f.write(json.dumps(json_line) + "\n")
             output_data.append(json_line)
     return output_data
@@ -163,6 +137,12 @@ def chatbot_qa(prompt, model_name):
 
     return response.choices[0].text.strip()
 
+def output_to_json(summarized_messages, output_file):
+    with open(output_file, "w") as f:
+        for conversation in summarized_messages:
+            f.write(json.dumps(conversation) + "\n")
+
+
 def parse_args():
     default_prompt = ""
 
@@ -170,10 +150,8 @@ def parse_args():
     parser.add_argument("--api_key", required=False, default="", help="Your OpenAI API key")
     parser.add_argument("--your_name", required=True, help="Your name for the chatbot")
     parser.add_argument("--folder", required=False, default="./", help="Path to the folder containing Facebook data")
-    parser.add_argument("--gpt_summarizer_model", default="", help="Name of the GPT summarization model to use")
     parser.add_argument("--gpt_fine_tuned_model", default="", help="Name of the GPT fine-tuned model to use")
     parser.add_argument("--output", default="training_data.json", help="Output file for the training data")
-    parser.add_argument("--t5_summarizer_model", default="", help="Summarization model for the training data: use t5-small to enable")
     parser.add_argument("--personality", default=default_prompt,
                         help="General personality of your AI bot")
     parser.add_argument("--question", default="Tell me about yourself?", help="Question to ask your AI bot")
@@ -201,25 +179,9 @@ if __name__ == "__main__":
         sys.exit(0)
 
     messages = load_facebook_data(folder)
+    output_to_json(messages, output_file)
 
-    # T5
-    if args.gpt_summarizer_model == "":
-        if args.t5_summarizer_model == "":
-            ## no summaries
-            summarized_messages = messages
-        else:
-            tokenizer = T5Tokenizer.from_pretrained(args.t5_summarizer_model, model_max_length=max_chars)
-            model = T5ForConditionalGeneration.from_pretrained(args.t5_summarizer_model)
-            with ProcessPoolExecutor() as executor:
-                summarized_messages = list(tqdm(executor.map(parallel_summarize_t5,
-                                                             messages, [max_chars] * len(messages),
-                                                             [tokenizer] * len(messages), [model] * len(messages)),
-                                                total=len(messages), desc="Summarizing messages"))
-    else:
-        # chatGPT
-        summarized_messages = generate_summary_gpt([msg for conv in messages for msg in conv if 'content' in msg], max_chars, args.gpt_summarizer_model)
-
-    input_output_pairs = create_training_data(summarized_messages, your_name)
+    input_output_pairs = create_training_data(messages, your_name)
     input_output_pairs_final = save_training_data(input_output_pairs, output_file)
     print(f"Summarized training data saved to {output_file}")
 
