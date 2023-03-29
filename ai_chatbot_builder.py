@@ -185,7 +185,7 @@ def compress_message_nlp(message, nlp):
 def compress_messages_nlp(messages, nlp, num_threads=os.cpu_count()):
     with concurrent.futures.ThreadPoolExecutor(max_workers=num_threads) as executor:
         compressed_texts = list(executor.map(lambda msg: compress_message_nlp(msg, nlp), messages))
-    return ''.join(compressed_texts)
+    return '\n'.join(compressed_texts)
 
 
 def write_messages_to_file(messages, output_file):
