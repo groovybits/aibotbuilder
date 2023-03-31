@@ -72,7 +72,7 @@ def extract_messages(data, your_name):
         extracted_messages = []
 
         for message in data['messages']:
-            if message['sender_name'] == your_name:
+            if your_name == "ALL" or message['sender_name'] == your_name:
                 extracted_messages.append(message)
 
     return extracted_messages
@@ -190,13 +190,13 @@ def compress_messages_nlp(messages, nlp, num_threads=os.cpu_count()):
 
 def write_messages_to_file(messages, output_file):
     with open(output_file, 'w', encoding='utf-8') as file:
-        json.dump(messages, file, ensure_ascii=False, indent=4)
+        json.dump(messages, file, ensure_ascii=True, indent=4)
 
 def write_messages_to_pdf(text, output_file):
     pdf = fpdf.FPDF()
     pdf.add_page()
     pdf.set_font("Arial", size=12)
-    pdf.multi_cell(0, 10, text)
+    pdf.multi_cell(0, 10, json.dumps(text))
     pdf.output(output_file)
 
 def remove_non_latin1_characters(text):
@@ -217,6 +217,10 @@ def read_pdf_data(file_path):
 def get_message_sets(your_names):
     message_sets = []
 
+    if len(your_names) == 1 and your_names[0] == "ALL":
+        message_sets.append(collect_messages("ALL"))
+        return message_sets
+
     for your_name in your_names:
         your_name = your_name.strip()
         message_sets.append(collect_messages(your_name))
@@ -234,9 +238,10 @@ def collect_messages(your_name):
                     data = json.load(json_file)
 
                     for message in data['messages']:
-                        if 'content' in message and message['sender_name'] == your_name:
+                        if 'content' in message and ((your_name == "ALL" and message['sender_name'] != "Facebook user") or message['sender_name'] == your_name):
                             text = message['content']
-                            messages_set.append({'sender_name': your_name, 'content': text})
+                            sender_name = message['sender_name']
+                            messages_set.append({'sender_name': sender_name, 'content': text})
             elif file.endswith('.xml'):
                 file_path = os.path.join(root, file)
                 data = read_sms_data(file_path)
@@ -246,7 +251,7 @@ def collect_messages(your_name):
             elif file.endswith('.pdf') and root.startswith('./books'):
                 file_path = os.path.join(root, file)
                 text = read_pdf_data(file_path)
-                messages_set.append({'sender_name': your_name, 'content': text})
+                messages_set.append({'sender_name': "", 'content': text})
 
     return messages_set
 
@@ -255,7 +260,7 @@ def main():
     parser = argparse.ArgumentParser(description='Script to process and summarize text messages.')
 
     # Add arguments
-    parser.add_argument('--your_names', type=str, default="John Doe", help='Comma-separated names in the Facebook profile and messages to use.')
+    parser.add_argument('--your_names', type=str, default="ALL", help='Comma-separated names in the Facebook profile and messages to use.')
     parser.add_argument('--gpt_api_key', type=str, default="None", help='GPT OpenAI Key')
     parser.add_argument('--max_chars', type=int, default=3950000, help='Chatbase.io allowance for input characters.')
     parser.add_argument('--use_gpt2', action='store_true', help='Use GPT-2 for summarization, the default is NLP (fast).')
@@ -283,10 +288,13 @@ def main():
     message_sets = get_message_sets(your_names)
 
     for your_name, message_set in zip(your_names, message_sets):
-        output_json_file = f"{your_name.strip().replace(' ', '_')}_output.json"
         output_text_file = f"{your_name.strip().replace(' ', '_')}_output.txt"
         output_full_text_file = f"{your_name.strip().replace(' ', '_')}_full_output.txt"
+        output_json_file = f"{your_name.strip().replace(' ', '_')}_output.json"
+        output_json_c_file = f"{your_name.strip().replace(' ', '_')}_output_compressed.json"
         output_pdf_file = f"{your_name.strip().replace(' ', '_')}_output.pdf"
+        output_pdf_c_file = f"{your_name.strip().replace(' ', '_')}_output_compressed.pdf"
+        output_pdf_t_file = f"{your_name.strip().replace(' ', '_')}_output_truncated.pdf"
 
         model, tokenizer, model_type = load_model(use_nlp, args.use_gpt3)
 
@@ -298,6 +306,9 @@ def main():
             compressed_text = compress_messages_gpt(message_set, model, tokenizer, max_chars, use_gpt3=args.use_gpt3)
 
         write_messages_to_file(message_set, output_json_file)
+        write_messages_to_pdf(message_set, output_pdf_file)
+        write_messages_to_file(compressed_text, output_json_c_file)
+        write_messages_to_pdf(compressed_text, output_pdf_c_file)
 
         # Remove non-Latin-1 characters
         latin1_text = remove_non_latin1_characters(compressed_text)
@@ -311,7 +322,7 @@ def main():
         with open(output_text_file, 'w', encoding='latin-1') as file:
             file.write(truncated_text)
 
-        write_messages_to_pdf(latin1_text, output_pdf_file)
+        write_messages_to_pdf(latin1_text, output_pdf_t_file)
 
 if __name__ == '__main__':
     main()

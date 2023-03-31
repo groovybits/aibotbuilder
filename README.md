@@ -1,6 +1,6 @@
 ### aibotbuilder
 
-## AI Bot Builder from FB Messages, SMS, PDF Files/Books
+## AI Bot Builder from FB Messages, SMS, PDF Files/Books, Videos
 
 # Description
 - This repository includes scripts to build AI chatbots using Facebook messages, SMS, and PDF files/books as training data.
@@ -9,6 +9,7 @@
 - ai_chatbot_builder.py: A chatbot builder script for chatbase.co.
 - ai_chatbot_builder_v2.py: A GPT fine-tuning script that creates a model with your message data, using GPT-2 or GPT-3.
 - generate_training_data.py: A script that processes and cleans Facebook message data to generate prompt and response pairs for training models.
+- video_fingerprint_ai.py: Analyze video and extract OCR Text, Images recognized, Perceptual Hashes and Hamming distance between frames of reference video.
 
 
 # Groovy.org example bots: https://groovy.org/groovy-ai-chat-bots use chatbase.co
@@ -57,7 +58,7 @@ $ ./ai_chatbot_builder_v2.py --your_name "John Doe" --api_key=cat API_KEY.txt
 ## How to use v1:
 
 ```bash
-usage: ai_chatbot_builder.py [-h] [--your_names YOUR_NAMES] [--gpt_api_key GPT_API_KEY] [--max_chars MAX_CHARS] [--use_gpt2] [--use_gpt3]
+Usage: ai_chatbot_builder.py [-h] [--your_names YOUR_NAMES] [--gpt_api_key GPT_API_KEY] [--max_chars MAX_CHARS] [--use_gpt2] [--use_gpt3]
 
 Script to process and summarize text messages.
 
@@ -77,25 +78,21 @@ options:
 ## How to use v2:
 
 ```
-usage: ai_chatbot_builder_v2.py [-h] [--api_key API_KEY] --your_name YOUR_NAME [--folder FOLDER] [--gpt_fine_tuned_model GPT_FINE_TUNED_MODEL] [--output OUTPUT]
-                                [--personality PERSONALITY] [--question QUESTION] [--max_chars MAX_CHARS]
+usage: ai_chatbot_builder_v2.py [-h] --your_name YOUR_NAME [--target_user TARGET_USER] [--folder FOLDER] [--json_output JSON_OUTPUT] [--pdf_output PDF_OUTPUT]
 
-Fine-tune GPT Models with Facebook Messenger data
+Create Training Data from Facebook Messenger
 
 options:
   -h, --help            show this help message and exit
-  --api_key API_KEY     Your OpenAI API key
   --your_name YOUR_NAME
                         Your name for the chatbot
+  --target_user TARGET_USER
+                        Target user to include in the training data (optional)
   --folder FOLDER       Path to the folder containing Facebook data
-  --gpt_fine_tuned_model GPT_FINE_TUNED_MODEL
-                        Name of the GPT fine-tuned model to use
-  --output OUTPUT       Output file for the training data
-  --personality PERSONALITY
-                        General personality of your AI bot
-  --question QUESTION   Question to ask your AI bot
-  --max_chars MAX_CHARS
-                        Maximum number of characters for summary
+  --json_output JSON_OUTPUT
+                        Output file for the training data in JSON format
+  --pdf_output PDF_OUTPUT
+                        Output file for the training data in PDF format
 ```
 
 
@@ -110,6 +107,26 @@ positional arguments:
 
 optional arguments:
   -h, --help          show this help message and exit
+```
+
+### video fingerprint AI
+
+# Generate data to use for an AI bot or source input / fine tuning
+```
+usage: video_fingerprint_ai.py [-h] [--start START] [--end END] source_video_path derivative_video_path output_dir
+
+Process video frames and extract data for AI training.
+
+positional arguments:
+  source_video_path     Path to the source video
+  derivative_video_path
+                        Path to the derivative video
+  output_dir            Path to the output directory
+
+options:
+  -h, --help            show this help message and exit
+  --start START         Start time in seconds
+  --end END             End time in seconds
 ```
 
 ---
