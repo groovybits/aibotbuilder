@@ -262,9 +262,10 @@ def main():
     # Add arguments
     parser.add_argument('--your_names', type=str, default="ALL", help='Comma-separated names in the Facebook profile and messages to use.')
     parser.add_argument('--gpt_api_key', type=str, default="None", help='GPT OpenAI Key')
-    parser.add_argument('--max_chars', type=int, default=3950000, help='Chatbase.io allowance for input characters.')
+    parser.add_argument('--max_chars', type=int, default=999999999999, help='Chatbase.io allowance for input characters.')
     parser.add_argument('--use_gpt2', action='store_true', help='Use GPT-2 for summarization, the default is NLP (fast).')
     parser.add_argument('--use_gpt3', action='store_true', help='Use GPT-3 for summarization instead of GPT-2. Use your API Key')
+    parser.add_argument('--use_nlp', action='store_true', help='Use NLP for summarization (fast).')
 
     # Parse arguments
     args = parser.parse_args()
@@ -274,8 +275,8 @@ def main():
     max_chars = args.max_chars
     use_gpt3 = args.use_gpt3
     use_gpt2 = args.use_gpt2
+    use_nlp = args.use_nlp
 
-    use_nlp = True
     if use_gpt3:
         if not check_gpt3_api_key(args.gpt_api_key):
             print("Invalid GPT-3 API key. Exiting.")
@@ -298,31 +299,36 @@ def main():
 
         model, tokenizer, model_type = load_model(use_nlp, args.use_gpt3)
 
+        compressed_text = None
         if use_nlp:
             nlp = spacy.load("en_core_web_sm")
             nlp.max_length = 9999999
             compressed_text = compress_messages_nlp(message_set, nlp)
-        else:
+        elif use_gpt3 or use_gpt2:
             compressed_text = compress_messages_gpt(message_set, model, tokenizer, max_chars, use_gpt3=args.use_gpt3)
 
+        # Write regular text files
         write_messages_to_file(message_set, output_json_file)
         write_messages_to_pdf(message_set, output_pdf_file)
-        write_messages_to_file(compressed_text, output_json_c_file)
-        write_messages_to_pdf(compressed_text, output_pdf_c_file)
 
-        # Remove non-Latin-1 characters
-        latin1_text = remove_non_latin1_characters(compressed_text)
+        # If we compressed, write those files too
+        if compressed_text != None:
+            write_messages_to_file(compressed_text, output_json_c_file)
+            write_messages_to_pdf(compressed_text, output_pdf_c_file)
 
-        # Truncate output to our limitations of the chatbot input
-        truncated_text = latin1_text[:max_chars]
+            # Remove non-Latin-1 characters
+            latin1_text = remove_non_latin1_characters(compressed_text)
 
-        with open(output_full_text_file, 'w', encoding='latin-1') as file:
-            file.write(latin1_text)
+            # Truncate output to our limitations of the chatbot input
+            truncated_text = latin1_text[:max_chars]
 
-        with open(output_text_file, 'w', encoding='latin-1') as file:
-            file.write(truncated_text)
+            with open(output_full_text_file, 'w', encoding='latin-1') as file:
+                file.write(latin1_text)
 
-        write_messages_to_pdf(latin1_text, output_pdf_t_file)
+            with open(output_text_file, 'w', encoding='latin-1') as file:
+                file.write(truncated_text)
+
+            write_messages_to_pdf(latin1_text, output_pdf_t_file)
 
 if __name__ == '__main__':
     main()
